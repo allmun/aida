@@ -1,0 +1,11 @@
+#!/usr/bin/bash
+
+#MIT License
+#Copyright (c) 2026 allmun
+
+set -e
+
+source /var/aida/lib/aida-lib.sh
+
+# Call lib function to run shell commands on snakshot in chroot
+run_chroot_shell_commands "$@"

@@ -1,0 +1,11 @@
+# This contains the list of systemd system services to enable after updating software.
+#
+# WARNING: User services not defined below will be DISABLED!
+#
+# Do not remove lines from this file. Instead use # to disble line.
+#
+# The initial list of enabled user services was found with the following command:
+# systemctl list-unit-files --type=service --state=enabled --user
+
+# UNIT FILE             STATE   PRESET 
+xdg-user-dirs.service enabled enabled

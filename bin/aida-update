@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+
+#MIT License
+#Copyright (c) 2026 allmun
+
+set -e
+
+source /var/aida/lib/aida-lib.sh
+
+# Call function to perform the declarative software update on the root snapshot on the mount point
+update_root_subvol
+
+echo "Run 'aida-switch' to make changes permanent"
