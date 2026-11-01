@@ -1,0 +1,20 @@
+# This contains the list of systemd system services to enable after updating software.
+#
+# WARNING: System services not defined below will be DISABLED!
+#
+# Do not remove lines from this file. Instead use # to disble line.
+#
+# The initial list of enabled system services was found with the following command:
+# systemctl list-unit-files --type=service --state=enabled
+
+# UNIT FILE                          STATE   PRESET
+avahi-daemon.service               enabled disabled
+bluetooth.service                  enabled disabled
+getty@.service                     enabled enabled 
+grub-btrfsd.service                 enabled enabled
+lightdm.service                    enabled disabled
+NetworkManager-dispatcher.service  enabled disabled
+NetworkManager-wait-online.service enabled disabled
+NetworkManager.service             enabled disabled
+sshd.service                       enabled disabled
+systemd-timesyncd.service          enabled enabled 

@@ -1,0 +1,393 @@
+#!/usr/bin/bash
+
+#MIT License
+#Copyright (c) 2026 allmun
+
+if [ "$EUID" -ne 0 ]; then
+  echo "This script must be run as root"
+  exit 1
+fi
+
+# Path of aida lib, the snapshot directory and the mount folder for individual snapshots
+aida_lib="/var/aida/lib"
+snapshot_dir="/.snapshots"
+snapshot_mnt="/var/aida/mnt"
+
+# Include library
+source "$aida_lib/aida-lib.sh"
+set +e # this script uses constructs that does not work with -e as set in source
+
+# Various global variables
+snapshot_names=()
+snapshots=()
+status=""
+root_name=""
+grub_name=""
+mount_name=""
+
+# Get list of snapshot names from /.snapshots with newest first
+get_snapshots() {
+    snapshot_names=()
+    while read -r snapshot; do
+        [ -n "$snapshot" ] && snapshot_names+=("$snapshot")
+    done < <(ls -1 "$snapshot_dir" | sort -r | grep -E '^[0-9]{14}$')
+}
+
+# Snapshotname of current root
+get_root_name() {
+    root_name=$(findmnt / | grep -oP '@snapshots/S*?\d{14}/snapshot' | head -n 1 | awk -F'/' '{print $2}')
+    echo "Root snapshot: $root_name"
+}
+
+# Snapshotname of root in grub
+get_grub_name() {
+    grub_name=$(grep -oP '@snapshots/S*?\d{14}/snapshot' /boot/grub/grub.cfg | head -n 1 | awk -F'/' '{print $2}')
+    echo "Grub snapshot: $grub_name"
+}
+
+# Get snapshotname of chroot mount
+get_mount_name() {
+    mount_name=$(findmnt /var/aida/mnt | grep -oP '@snapshots/S*?\d{14}/snapshot' | head -n 1 | awk -F'/' '{print $2}')
+    echo "Mounted snapshot: $mount_name"
+}
+
+
+
+# Chekck if argument equals the namoe of the currently mounted root snapshot
+check_root() {
+    local snapshot=$1
+    [[ "$snapshot" == "$root_name" ]] && echo "R" || echo ""
+}
+check_root_index() {
+    local index=$1
+    local snapshot="${snapshot_names[$index]}"
+    check_root "$snapshot"
+}
+# Check if the argument equals the name of the root in grub.cfg
+check_grub() {
+    local snapshot=$1
+    [[ "$snapshot" == "$grub_name" ]] && echo "G" || echo ""
+}
+check_grub_index() {
+    local index=$1
+    local snapshot="${snapshot_names[$index]}"
+    check_grub "$snapshot"
+}
+# Check if the argument equals the name of the snapshot mounted on /var/archotmic/mnt
+check_mounted() {
+    local snapshot=$1
+    [[ "$snapshot" == "$mount_name" ]] && echo "M" || echo ""
+}
+check_mounted_index() {
+    local index=$1
+    local snapshot="${snapshot_names[$index]}"
+    check_mounted "$snapshot"
+}
+
+# Delete multiple snopshots except the root or grub snapshots
+delete_multiple_snapshot_numbers() {
+    local snapshot
+    local -a snapshot_numbers
+    read -a snapshot_numbers <<< "$@"
+    status="Deleted snapshot(s):"
+    local snapshot
+    local index
+    for number in "${snapshot_numbers[@]}"; do
+        (( index = number - 1 ))
+        if [[ -n "$(check_root_index $index)" ]]; then
+            status="Cannot delete currently mounted root snapshot ($number)"
+            echo "$status"
+            continue
+        fi
+        if [[ -n "$(check_grub_index $index)" ]]; then
+            status="Cannot delete snapshot ($number) set for next boot in grub"
+            echo "$status"
+            continue
+        fi
+        snapshot="${snapshot_names[$index]}"
+        # Get confirmation to delete snapshot
+        # read -n1 -p "Delete snapshot $number ($snapshot) [y/N]" delete
+        while true; do
+            read -n1 -p "Delete snapshot $number ($snapshot) [y/n]" delete
+            printf "\n"
+            case $delete in
+                [yYnN]* ) break;;
+            esac
+        done
+        # Delete snapshot if answer == y
+        if [[ "${delete^^}" == "Y" ]]; then
+            # Unmount snapshot if mounted on /var/aida/mnt
+            if [[ "$(check_mounted $snapshot)" == "M" ]]; then
+                cleanup_chroot
+                stderr=$(umount $snapshot_mnt 2> >(tee >/dev/stderr))
+                if [ $? -ne 0 ]; then
+                    status="$status :: Error: $stderr."
+                    return 1
+                fi
+            fi
+            # Delete the btrfs subvolume (snapshot)
+            stderr=$(btrfs subvolume delete "$snapshot_dir/$snapshot/snapshot" 2> >(tee >/dev/stderr))
+            if [ $? -ne 0 ]; then
+                status="$status :: Error: $stderr."
+                return 1
+            fi
+            # Delete the overlays and the snapshot folder
+            stderr=$(rm -rf "$snapshot_dir/$snapshot")
+            if [ $? -ne 0 ]; then
+                status="$status :: Error: $stderr."
+                return 1
+            fi
+            status="$status $snapshot"
+        else
+            echo "Skipping snapshot $number ($snapshot)"
+        fi
+    done
+    return 0
+}
+
+# Remount the /var/aida/mnt folder by unmounting any mounted snapshot and then mount argument (selected shapshot )
+remount_snapshot_name() {
+    local snapname="$1"
+    # First, unmount any shapshot that may be mounted
+    if [ -n "$mount_name" ]; then
+        cleanup_chroot
+        stderr=$(umount "$snapshot_mnt" 2> >(tee /dev/stderr))
+        if [ $? -ne 0 ];then
+            status="Error: Cannot unmount $mount_name :: $stderr."
+            echo "$status"
+            return 1
+        fi
+    fi
+    # Mount selected snapshpt
+    stderr=$(mount --bind "$snapshot_dir/$snapname/snapshot" "$snapshot_mnt" 2> >(tee /dev/stderr))
+    if [ $? -ne 0 ]; then
+        status="Error: Cannot mount $mount_name :: $stderr."
+        echo "$status"
+        return 1
+    else
+        get_mount_name
+    fi
+    return 0
+}
+remount_snapshot_number() {
+    local number=$1
+    local snapname="${snapshot_names[$number -1]}"
+    remount_snapshot_name "$snapname"
+    return $?
+}
+
+# Swtich to snapshot current
+switch_to_snapshot_number() {
+    local number=$1
+    local snapshot="${snapshot_names[$number -1]}"
+    local snapdate stderr
+    snapdate="$(name_to_datetime $snapshot)"
+    # Ignore if already selected in grub
+    if [[ "$(check_grub $snapshot)" == "G" ]]; then
+        status="Ignored: Snapshot $number_str ($snapshot) already selected in grub"
+        return 1
+    fi
+    # Mount snapshot but return of unsuccesfull
+    remount_snapshot_number "$number"
+    if [ $? -ne 0 ]; then
+        status="Error: Cannot remount snapshot from $mount_name to $snapshot"
+        return 1
+    fi
+    # Switch to mounted snapshot if possible
+    if [[ -n "$mount_name" ]]; then
+        echo "Switching to snapshot $mount_name ($snapdate) ..."
+        status="Swithced to snapshot $mount_name ($snapdate)"
+        stderr="$(aida-switch 2> >(tee /dev/stderr))"
+        if [ $? -ne 0 ]; then
+            status="Error: Cannot generate grub menu: $stderr."
+            return 1
+        fi
+    else
+        status="Cannot switch to new snapshot: No snapshot mounted"
+    fi
+    return 0
+}
+
+
+# Clone/create an existing snapshot or / (root)
+clone_snapshot_number() {
+    local number=$1
+    local existing_snapshot_name="${snapshot_names[$number -1]}"
+    #local cloned_snapshot_name="$(date +%Y%m%d%H%M%S)"
+    # Substitute existing snapshot name if snapshot is currently mounted root
+    [[ "$(check_root $existing_snapshot_name)" == "R" ]] && existing_snapshot_name="/"
+    # Call library function to create new snapshot
+    create_snapshot_from "$existing_snapshot_name"
+    return $?
+}
+
+# Run declarative update on selected snaphot number
+update_snapshot_number() {
+    local number=$1
+    local snapname="${snapshot_names[number - 1]}"
+    local snapdate="$(name_to_datetime $snapname)"
+    # Cannot update current root
+    if [[ "$(check_root $snapname)" == "R" ]]; then
+        status="Error: Cannot update root. Please create a clone or select another snapshot"
+        return 1
+    fi
+    # Mount snapshot but return of unsuccesfull
+    remount_snapshot_number "$number"
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+    # Update mounted snapshot if possible
+    if [[ -n "$mount_name" ]]; then
+        echo "Updating snapshot $mount_name ($snapdate) ..."
+        status="Updated snapshot $mount_name ($snapdate)"
+        # Call script to update mounted snapshot
+        # (notice that 'aida-update' may require user inputs)
+
+        #stderr=$(aida-update 2> >(tee /dev/stderr))
+        stderr="unknown"
+        command aida-update
+
+        if [ $? -ne 0 ]; then
+            status="Error: Cannot update snapshot $number ($snapname): $stderr."
+            return 1
+        fi
+    else
+        status="Cannot switch to new snapshot: No snapshot mounted"
+        return 1
+    fi
+    return 0
+}
+
+parse_action() {
+    local action="$1"
+    local length=${#snapshot_names[@]}
+    local minumum=1
+    local maximum=${#snapshot_names[@]}
+    case $action in
+            [qQ]* )
+                printf "\n\n"
+                exit 0
+                ;;
+            [cC]* )
+                read -p " " number
+                status="Invalid number: $number"
+                if [[ $number =~ ^-?[0-9]+$ ]]; then
+                    if (( number > 0 && number <= length )); then
+                        status="Cloning snapshot: $number"
+                        clone_snapshot_number "$number"
+                    fi
+                fi
+                ;;
+            [uU]* )
+                read -p " " number
+                status="Invalid number: $number"
+                if [[ $number =~ ^-?[0-9]+$ ]]; then
+                    if (( number > 0 && number <= length )); then
+                        status="Updating snapshot: $number"
+                        update_snapshot_number "$number"
+                    fi
+                fi
+                ;;
+            [gG]* )
+                read -p " " number
+                status="Invalid number: $number"
+                if [[ "$number" == "" || $number =~ ^-?[0-9]+$ ]]; then
+                    if (( number > 0 && number <= length )); then
+                        status="Switching to snapshot: $number"
+                        switch_to_snapshot_number "$number"
+                    fi
+                fi
+                ;;
+#            [sS]* )
+#                read -p " " number
+#                status="Invalid number: $number"
+#                if [[ $number =~ ^-?[0-9]+$ ]]; then
+#                    if (( number > 0 && number <= length )); then
+#                        status="Selecting snapshot: $number"
+#                    fi
+#                fi
+#                ;;
+            [dD]* )
+                read -p " " number_str
+                status="Illegal number(s): $number_str"
+                numbers=$(bash "$aida_lib/aida-numbers-to-array.sh" "$minumum" "$maximum" "$number_str")
+                if [[ -n $numbers ]]; then
+                    status="Deleting: $numbers"
+                    delete_multiple_snapshot_numbers $numbers
+                fi
+                ;;
+            * )
+                status="Illegal command: $action"
+                ;;
+        esac
+}
+
+print_table() {
+    local idx=0 snapshot check datetime
+    local -a rows=()
+    header=("#" "Date and Time" "Root" "Grub" "Mount" "Name")
+    for snapshot in "${snapshot_names[@]}"; do
+        ((idx += 1))
+        root_chk=$(check_root "$snapshot")
+        grub_chk=$(check_grub "$snapshot")
+        mnt_chk=$(check_mounted $snapshot)
+        datetime=$(name_to_datetime "$snapshot")
+        # Store each row's four fields in sequence.
+        rows+=("$idx" "$datetime" "$root_chk" "$grub_chk" "$mnt_chk" "$snapshot")
+    done
+    # Make the rows available globally, like Python's `snapshots`.
+    snapshots=("${rows[@]}")
+    # Print table header
+    printf '%-5s %-22s %-5s %-5s %-5s %-20s\n' \
+        "${header[0]}" "${header[1]}" "${header[2]}" "${header[3]}" "${header[4]}" "${header[5]}"
+    printf '%s\n' '------------------------------------------------------------'
+    # Print table rows
+    j=0
+    for ((i = 0; i < ${#rows[@]}; i += ${#header[@]})); do
+        (( j += 1 ))
+        # Print in alternating colors (red/green)
+        if (( j % 2 == 0 )); then
+            printf '\e[31m%-5s %-22s %-5s %-5s %-5s %-20s\e[0m\n' \
+                "${rows[i]}" "${rows[i+1]}" "${rows[i+2]}" "${rows[i+3]}" "${rows[i+4]}" "${rows[i+5]}"
+        else
+            printf '\e[32m%-5s %-22s %-5s %-5s %-5s %-20s\e[0m\n' \
+                "${rows[i]}" "${rows[i+1]}" "${rows[i+2]}" "${rows[i+3]}" "${rows[i+4]}" "${rows[i+5]}"
+        fi
+    done
+    # Print recommendation line
+    [[ "$grub_name" != "$root_name" ]] && printf '\n%s\n' "Reboot to activate grub snapshot $grub_name"
+    # Print status line
+    [[ -n $status ]] && printf '\n%s\n' "$status"
+    printf '\n'
+}
+
+# Main loop run until action==q checked in parseaction
+main() {
+    # Prepare for loop: Get data from disk:
+    get_root_name
+    get_grub_name
+    get_mount_name
+    get_snapshots
+    status="Root: $root_name :: Grub: $grub_name"
+    while [ True ]; do
+        # Clear screen:
+        printf "\033[H\033[J" ""
+        print_table
+        printf "Actions: q (quit), c (clone), d (delete), u (update), g (grub): "
+        read -n 1 action
+        parse_action $action
+        #
+        # Degbug:
+        #[[ -n $status ]] && printf '\n%s\n' "$status"
+        #printf '\n'
+        #read -n 1 -p "Press any key to coninue"
+        # End of debug
+        #
+        # Prepare for next round
+        get_grub_name
+        get_mount_name
+        get_snapshots
+    done
+}
+
+main

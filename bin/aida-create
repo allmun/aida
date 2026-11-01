@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+
+#MIT License
+#Copyright (c) 2026 allmun
+
+set -e
+
+source /var/aida/lib/aida-lib.sh
+
+# Call function to create and mount new snapshot on
+echo "Creating snapshot ..."
+mount_root_subvol
+#echo "Snapshot created"

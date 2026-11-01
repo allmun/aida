@@ -1,0 +1,7 @@
+#!/usr/bin/bash
+
+#MIT License
+#Copyright (c) 2026 allmun
+
+echo "Rebooting..."
+systemctl reboot
