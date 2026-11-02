@@ -8,6 +8,18 @@ set -e
 # Prevent running this script muliple times
 if [ -f "/var/aida/.done/$0" ]; then
     echo ""; echo "$0 has already been executed"
+    if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then 
+        echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' to continue installation"; exit 1
+    fi
+    if [[ ! -f "/var/aida/.done/3rd-boot-install-aida.sh" ]]; then
+        echo "Run 'sudo bash 3rd-boot-install-aida.sh' to continue installation"; exit 1
+    fi
+    if [[ ! -f "/var/aida/.done/4th-boot-create-snapshots.sh" ]]; then
+        echo "Run 'sudo bash 4th-boot-create-snapshots.sh' to continue installation"; exit 1
+    fi
+    if [[ ! -f "/var/aida/.done/5th-boot-make-immutable.sh" ]]; then
+        echo "Run 'sudo bash 5th-boot-make-immutable.sh' to continue installation"; exit 1
+    fi
     echo "All installation scripts executed. If updating, run 'sudo update-installation.sh'"; echo ""; exit 1
 fi
 
@@ -49,6 +61,7 @@ nano /var/aida/mnt/etc/fstab
 switch_to_new_snapshot
 
 # Mark this script as executed
+mkdir -p /var/aida/.done
 touch "/var/aida/.done/$0"
 
 echo ""

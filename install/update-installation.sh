@@ -28,7 +28,7 @@ echo ""
 echo "Removing old install from /var/aida/ ..."
 for dir in /var/aida/*/; do
     dir=${dir%/}
-    if [[ "$dir" != "" && "$dir" != "/" && "$dir" != "/var/aida/mnt" "$dir" != "/var/aida/.done" ]]; then
+    if [[ "$dir" != "" && "$dir" != "/" && "$dir" != "/var/aida/mnt" && "$dir" != "/var/aida/.done" ]]; then
         echo "$dir"
         rm -rf "$dir"
     fi
