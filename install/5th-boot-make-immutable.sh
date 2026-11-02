@@ -5,6 +5,13 @@
 
 set -e
 
+# Prevent running this script muliple times
+if [ -f "/var/aida/.done/$0" ]; then
+    echo ""; echo "$0 has already been executed"
+    echo "All installation scripts executed. If updating, run 'sudo update-installation.sh'"; echo ""; exit 1
+fi
+
+
 if [ "$EUID" -ne 0 ]; then
   echo "This script must be run as root"
   exit 1
@@ -15,9 +22,6 @@ fi
     echo "This script mist be executed from the 'aida/install'folder"
     exit 1
 }
-
-# Save this location for later
-hereis_aida_install="$PWD"
 
 # Check that the conditions for applying aida is fulfilled
 verbose="1"
@@ -44,10 +48,8 @@ nano /var/aida/mnt/etc/fstab
 # Swithc to new snapshot by updating the grub menu
 switch_to_new_snapshot
 
-# Rename this script to ensure that it's only executed once
-cd "$hereis_aida_install"
-mv "./$0" "./do-not-run-again_$0"
-
+# Mark this script as executed
+touch "/var/aida/.done/$0"
 
 echo ""
 echo "All done".
