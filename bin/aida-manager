@@ -258,6 +258,50 @@ update_snapshot_number() {
     return 0
 }
 
+edit_snapshot_number() {
+    local number=$1
+    local snapname="${snapshot_names[number - 1]}"
+    local snapdate="$(name_to_datetime $snapname)"
+    # Cannot update current root
+    if [[ "$(check_root $snapname)" == "R" ]]; then
+        status="Error: Cannot update root. Please create a clone or select another snapshot"
+        return 1
+    fi
+    # Mount snapshot but return of unsuccesfull
+    remount_snapshot_number "$number"
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+    status="Edited:"
+    while [ true ]; do
+        printf "\n"
+        read -n 1 -p "Edit: p (pacman.packages), s (system.services), u (user.services), d (done): " action
+        case $action in
+            [pP]* )
+                status="$status pacman.packages declaration"
+                nano /var/aida/mnt/etc/aida/pacman.packages
+                continue
+                ;;
+            [sS]* )
+                status="$status system.services declaration"
+                nano /var/aida/mnt/etc/aida/system.services
+                continue
+                ;;
+            [uU]* )
+                status="$status user.services declaration"
+                nano /var/aida/mnt/etc/aida/user.services
+                continue
+                ;;
+            [dD]* )
+                break
+                ;;
+            * )
+                continue
+                ;;
+        esac
+    done
+}
+
 parse_action() {
     local action="$1"
     local length=${#snapshot_names[@]}
@@ -298,15 +342,16 @@ parse_action() {
                     fi
                 fi
                 ;;
-#            [sS]* )
-#                read -p " " number
-#                status="Invalid number: $number"
-#                if [[ $number =~ ^-?[0-9]+$ ]]; then
-#                    if (( number > 0 && number <= length )); then
-#                        status="Selecting snapshot: $number"
-#                    fi
-#                fi
-#                ;;
+            [eE]* )
+                read -p " " number
+                status="Invalid number: $number"
+                if [[ $number =~ ^-?[0-9]+$ ]]; then
+                    if (( number > 0 && number <= length )); then
+                        status="Cloning snapshot: $number"
+                        edit_snapshot_number "$number"
+                    fi
+                fi
+                ;;
             [dD]* )
                 read -p " " number_str
                 status="Illegal number(s): $number_str"
@@ -373,7 +418,7 @@ main() {
         # Clear screen:
         printf "\033[H\033[J" ""
         print_table
-        printf "Actions: q (quit), c (clone), d (delete), u (update), g (grub): "
+        printf "Actions: q (quit), c (clone), d (delete), u (update), g (grub) e (edit): "
         read -n 1 action
         parse_action $action
         #
