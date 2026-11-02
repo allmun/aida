@@ -287,13 +287,17 @@ sudo aida-manager
 
 In this utility, it is possbile to (c) create snapshots, (d) delete snapshots, (u) update snapshots, and updating (g) grub menu (switch to new snapshots).
 
-## Prototype
+## Prototype versions
 
-The aida project is still a prototype and certain parts may not yet work as expectedd. 
+2026-11-02: Installation scripts and aida-manager updated with edit functionality
+
+2026-11-01: The prototy has been tested successfully in arch linux in qemu.
 
 2026-10-30: The aim is to have an working alpha release before the end of 2026. 
 
-2026-11-01: The prototy has been tested successfully in arch linux in qemu.
+The aida project is still a prototype and certain parts may not yet work as expectedd. 
+
+
 
 ## Disclaimer
 
