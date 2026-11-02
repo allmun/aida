@@ -120,6 +120,9 @@ sysdfile="$config_dir/system.services"
 declare -A declared_sysd=()
 declare -A enabled_sysd=()
 
+# Hard-coded addition of packages essential to aida:
+declared_sysd["grub-btrfsd.service"]=1
+
 # Read declared system services. Ignore comments, blanks, and section headings.
 while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%%#*}"
