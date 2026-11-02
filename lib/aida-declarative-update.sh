@@ -36,6 +36,11 @@ declare -A declared_pkgs=()
 declare -A installed_pkgs=()
 declare -A group_pkgs=()
 
+# Hard-coded addition of packages essential to aida:
+declared_pkgs[btrfs-progs]=1
+declared_pkgs[grub-btrfs]=1
+declared_pkgs[openssh]=1
+
 echo "Reading /etc/aida/pacman.packages declaration file ..."
 
 # Read declared package names. Ignore comments, blanks, and section headings.
