@@ -1,4 +1,5 @@
 # aida
+
 Atomic Immutable Declarative Archlinux
 
 ## Warning
@@ -23,9 +24,11 @@ However, several times I have experienced that the system went dead after a syst
 ## Limitations
 
 ### Only arch linux
+
 The aida system only work with arch based systems. Other linux variants such as debian or fedora based distributions are not supported. 
 
 #### No AUR
+
 The AUR (Arch User Repository) is not supported by aida. 
 Aida only supports the pacman package manager.
 It is possible to install AUR packages in the system space using the 'aida-shell', which create a chroot environment in which yay, paru and other package managers can be used.
@@ -33,7 +36,7 @@ Aida will not touch such foreign packages during updates, so it's the responsibi
 However, for security reasons, it is discouraged to use AUR packages at the system level.
 Instead, it is recommended to only install AUR packages in the user space using e.g. toolbx or distrobox.
 
-## Prerequisites 
+## Prerequisites
 
 ### File system layout
 
@@ -52,6 +55,7 @@ Aida will finally create overlays for selected folder on the root file system su
 ## Installing aida
 
 ### Install arch linux
+
 Personally, I prefer the Calam-Arch-Installer (https://sourceforge.net/projects/blue-arch-installer/), which makes it very easy to install Arch linux. Ensure that git is installed as part of the system (otherwise, the aida files and folders must be transferred to the system using other methods).
 
 After installation, open a terminal and run the following commands to get a working base configuration:
@@ -64,7 +68,6 @@ systemctl list-unit-files --type=service --state=enabled > system.services
 systemctl list-unit-files --type=service --state=enabled --user > user.services
 ```
 
-
 Inspect the pacman.packages, systen.services, and user.services to verify that they contain a valid configuration (they should not be empty).
 
 ### Download aida
@@ -76,6 +79,7 @@ git clone https://github.com/allmun/aida.git
 ```
 
 ### Update the configuration
+
 Change to the aida/config directory:
 
 ```
@@ -137,7 +141,7 @@ Now, reboot the system before proceeding to next step of the installation proced
 
 Do NOT proceed if the configuration looks invalid or if this step fails.
 
-### Install aida files 
+### Install aida files
 
 Run the following command to install the aida binaries, configuration, and libraries:
 
@@ -176,7 +180,6 @@ Known issue:
 The first boot on a new read-only snapshot may experience errors in the boot sequence because the system cannot write to the /etc folder, which initailly is read-only. Later in the boot sequence the /etc writable overlay is mounted such that subsequent writing to /etc can be done without problems. 
 It's highly recommended to reboot the system again before using the system for anything else. The second boot seems to go well. It's recommend to run 'journalctl -b' to check the boot log messages and to run 'journalctl -u etc.mount' to check if mounting of the /etc overlay went well. Finally, it is recommended to run 'findmnt' to inspect if / and /etc are mounted in the correct snapshot.
 
-
 ## Future updates to the aida framework
 
 The installation scripts (1st-boot-initial-prepare.sh, 2nd-boot-prepare-aida.sh, 3rd-boot-install-aida.sh, 4th-boot-create-snapshots.sh, and 5th-boot-make-immutable.sh) shall only be executed once!
@@ -196,12 +199,14 @@ sudo bash update-installation.sh
 1) Create new snapshot
 2) Modify the configuration
 3) Update snapshot
-4) Run shell commands
-5) Switch to snapshot
-6) Reboot system
-7) Or use the aida-manager
+4) Modify snapshots
+5) Run shell commands
+6) Switch to snapshot
+7) Reboot system
+8) Or use the aida-manager
 
 ### Create new snapshots
+
 The following command will create a new snapshot of the root file system:
 
 ```
@@ -237,9 +242,27 @@ This command will update the software but it will not stage the update for the n
 
 It is the responsibility of the user to inspec if the update ran without errors.
 
-### Run shell command on snapshot
+### Modify snapshots
 
-Optional step !
+Simple changes to snapshots can be done by adding, deleting, and modifying files on a snapshot mounted on /var/aida/mnt. For example, modifying the fstab can be done by running the following command:
+
+```
+sudo nano /var/aida/mnt/etc/fstab
+```
+
+This requires that a snapshot has been created and mounted on /var/aida/mnt. This can be accomplished by running `aida-create`, `aida-shell`, `aida-update`, or `aida-manager`. After modidying the new snapshot, the command `aida-switch` or the Grub command in `aida-manager` must be used for being able to boot into the new snapshot.
+
+For existing snapshots, it is possbile to make changes without first mounting as desscribed above because all snapshots are mounted on /.snapshots. So, to edit e.g. fstab on snapshot 20261104012732, run the following command:
+
+```
+sudo nano /.snapshots/20261104012732/snapshot/etc/fstab
+```
+
+However, modifying snapshots directly on /.snapshots/ violates the idea of atomicity and immutability and should therefore be avoided if possible. So, the preferred method is to create a new snapshot and make the modfications on that snapshot as described above.
+
+The methods descibed in this section only applies for simple modification such as adding, removing and updating files. For more elaborate changes, the modification must be performed in a chroot environment by running `aida-shell` as described in th section below.
+
+### Run shell command on snapshot
 
 Aida will allow the user to perform other changes to the system in a chroot environment of snapshot. For example, the user may want to install a package from AUR (not recommended).
 
@@ -247,7 +270,6 @@ To create a new snapshot and start a new chroot enviroment, run the following co
 
 ```
 sudo aida-shell
-
 ```
 
 Inside the chroot environment, the user can then run e.g.
@@ -276,7 +298,6 @@ This command will update the /boot/grub/grub.cfg to point to the new snapshot.
 
 The user must reboot the system for the changes to take effect.
 
-
 ### Using aida-manager
 
 To manage the system and the snapshots of the root file system , run the following command:
@@ -287,7 +308,15 @@ sudo aida-manager
 
 In this utility, it is possbile to (c) create snapshots, (d) delete snapshots, (u) update snapshots, and updating (g) grub menu (switch to new snapshots).
 
+## Known issues
+
+2026-11-04: Snapshot deletion - status: Unrevolved
+
+With the Delete command in `aida-manager` it is possible to delete snapshots. The snapshots are thus deleted from /.snapshots. However, the overlay and workdir folders can sometimes remain in /.snapshots. 
+
 ## Prototype versions
+
+2026-11-04: The prototype has been tested successfully on bare metal. 
 
 2026-11-02: Installation scripts and aida-manager updated with edit functionality
 
@@ -296,8 +325,6 @@ In this utility, it is possbile to (c) create snapshots, (d) delete snapshots, (
 2026-10-30: The aim is to have an working alpha release before the end of 2026. 
 
 The aida project is still a prototype and certain parts may not yet work as expectedd. 
-
-
 
 ## Disclaimer
 
