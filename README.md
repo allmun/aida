@@ -310,9 +310,19 @@ In this utility, it is possbile to (c) create snapshots, (d) delete snapshots, (
 
 ## Known issues
 
-2026-11-04: Snapshot deletion - status: Unrevolved
+**001--2026-11-04: Snapshot deletion - Solved 2026-11-04**
 
-With the Delete command in `aida-manager` it is possible to delete snapshots. The snapshots are thus deleted from /.snapshots. However, the overlay and workdir folders can sometimes remain in /.snapshots. 
+With the Delete command in `aida-manager` it is possible to delete snapshots. 
+The snapshots are intended to be deleted from /.snapshots. 
+However, the overlay and workdir folders can sometimes remain in /.snapshots. 
+This issue was fixed by updating the delete command in `aida-manager`.
+However, the fix will only remedy future deletions. 
+Older incomplete deletions must be cleanup manually by deleting the folders in /.-snapshots.
+
+**002--2026-11-04: Cannot delete stale snapshots - Accepted**
+
+During experimental testing, it has been observed that the /@snapshots contains some snapshot folders containing the info.xml and the overlay and workdir folders but no acutal snapshots which was partially deleted, see issue 2026-11-04-001. The manualy cleanup procedure used in 2026-11-04-001 cannot be used for the @snapshot folder because it is set as read-only, which prevents any form of altering the content of the folder. It should be possible to clean up by (1) creating a new snapshot and set the root file system as writable, (2) reboot  into the new writable snapshot, (3) delete any garbage, (4) create yet another snapshot and set it read-only, (5) boot into the new read-only snapshot, (6) update `aida-manager` and use it to delete the temporary writable snapshot. However this proposed process has not been tested. Typicallay, these stale shapshot folders take up very little data, so it may be acceptable to keep them. 
+
 
 ## Prototype versions
 

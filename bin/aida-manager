@@ -116,6 +116,12 @@ delete_multiple_snapshot_numbers() {
         done
         # Delete snapshot if answer == y
         if [[ "${delete^^}" == "Y" ]]; then
+            #Delete the info.xml, overlay and workdir folders
+            stderr=$(rm -rf "$snapshot_dir/$snapshot/*")
+            if [ $? -ne 0 ]; then
+                status="$status :: Error: $stderr."
+                return 1
+            fi
             # Unmount snapshot if mounted on /var/aida/mnt
             if [[ "$(check_mounted $snapshot)" == "M" ]]; then
                 cleanup_chroot
@@ -131,7 +137,7 @@ delete_multiple_snapshot_numbers() {
                 status="$status :: Error: $stderr."
                 return 1
             fi
-            # Delete the overlays and the snapshot folder
+            #Delete the the snapshot folder itself
             stderr=$(rm -rf "$snapshot_dir/$snapshot")
             if [ $? -ne 0 ]; then
                 status="$status :: Error: $stderr."
