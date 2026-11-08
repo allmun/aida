@@ -121,6 +121,7 @@ create_info_xml() {
     local snapshot_name="$2"
     local target="$snapshot_dir/$snapshot_name/info.xml"
     local datetime="$(name_to_datetime $snapshot_name)"
+    verbose_echo "Info: Creating $target"
     echo '<?xml version="1.0"?>' > "$target"
     echo "<snapshot>" >> "$target"
     echo "   <type>single</type>" >> "$target"
@@ -157,25 +158,30 @@ create_snapshot_from() {
     local old_snapshot_name="/"
     [[ -n "$1" ]] && old_snapshot_name="$1"
     local old_snapshot_full_name="/"
+    # Expand old snapshot name if not /
     [[ "$old_snapshot_name" != "/" ]] && old_snapshot_full_name="$snapshot_dir/$old_snapshot_name/snapshot"
     # Create the new snapshoot in folder datatime of /.snapshots
-    local snapshot_name=$(date +%Y%m%d%H%M%S)
-    local snapshot_full_name="$snapshot_dir/$snapshot_name/snapshot"
+    local new_snapshot_name=$(date +%Y%m%d%H%M%S)
+    local new_snapshot_full_name="$new_snapshot_dir/$new_snapshot_name/snapshot"
     # Create folders and info.xml for new snapshot
-    mkdir -p "$snapshot_dir/$snapshot_name/overlay/etc"
-    mkdir -p "$snapshot_dir/$snapshot_name/workdir/etc"
-    create_info_xml "$old_snapshot_name" "$snapshot_name"
+    mkdir -p "$snapshot_dir/$new_snapshot_name/overlay/etc"
+    mkdir -p "$snapshot_dir/$new_snapshot_name/workdir/etc"
+    create_info_xml "$old_snapshot_name" "$new_snapshot_name"
     # Create btrfs snapshot of currently booted root file system
-    btrfs subvolume snapshot "$old_snapshot_full_name" "$snapshot_full_name"
+    verbose_echo "Info: Creating $new_snapshot_full_name ..."
+    btrfs subvolume snapshot "$old_snapshot_full_name" "$new_snapshot_full_name"
+    verbose_echo "Info: Created $new_snapshot_full_name"
     # Mount new snapshot on working directory
+    verbose_echo "Info: checking $aida_mnt_dir folder..."
     [[ -n "$(findmnt $aida_mnt_dir)" ]] && umount "$aida_mnt_dir"
-    mount --bind "$snapshot_full_name" "$aida_mnt_dir"
+    verbose_echo "Info: $new_snapshot_full_name on $aida_mnt_dir"
+    mount --bind "$new_snapshot_full_name" "$aida_mnt_dir"
 #    # Update fstab for the new snapshot # no longer needed
 #    update_snapshot_fstab "$snapshot_name" # no longer needed
     # Show content of mounted snapshot:
     verbose_ls "$aida_mnt_dir"
     # Show that a new snapshot was created (even if verbose is off)
-    verbose_echo "A new snapshot $snapshot_name was created and mounted on $aida_mnt_dir"
+    verbose_echo "A new snapshot $new_snapshot_name was created and mounted on $aida_mnt_dir"
     return 0
 }
 
