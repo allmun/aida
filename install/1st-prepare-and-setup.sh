@@ -147,6 +147,7 @@ echo ""
 echo "Info: Creating snapshot of current root / for installing aida"
 unmount_aida_mnt
 #Crate new snapshot
+sleep 2
 mount_root_subvol
 
 # Run declarative updater to verify that it works
