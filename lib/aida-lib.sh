@@ -158,6 +158,7 @@ create_snapshot_from() {
     local old_snapshot_name="/"
     [[ -n "$1" ]] && old_snapshot_name="$1"
     local old_snapshot_full_name="/"
+
     # Expand old snapshot name if not /
     if [[ "$old_snapshot_name" != "/" ]];then
         old_snapshot_full_name="$snapshot_dir/$old_snapshot_name/snapshot"
@@ -166,8 +167,6 @@ create_snapshot_from() {
     # Create the new snapshoot in folder datatime of /.snapshots
     local new_snapshot_name=$(date +%Y%m%d%H%M%S)
     local new_snapshot_full_name="$snapshot_dir/$new_snapshot_name/snapshot"
-    verbose_echo "DEBUG: old=$old_snapshot_full_name"
-    verbose_echo "DEBUG: new=$new_snapshot_full_name"
 
     # Create folders and info.xml for new snapshot
     mkdir -p "$snapshot_dir/$new_snapshot_name/overlay/etc"
@@ -192,7 +191,7 @@ create_snapshot_from() {
     verbose_ls "$aida_mnt_dir"
 
     # Show that a new snapshot was created (even if verbose is off)
-    verbose_echo "A new snapshot $new_snapshot_name was created and mounted on $aida_mnt_dir"
+    verbose_echo "Info: A new snapshot $new_snapshot_name was created and mounted on $aida_mnt_dir"
     return 0
 }
 

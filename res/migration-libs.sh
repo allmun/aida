@@ -120,9 +120,7 @@ migrate_permissions() {
   local target=$2
   chown --reference="$source" "$target"
   chmod --reference="$source" "$target"
-  #set +e
-  #chcon --reference="$source" "$target"
-  #set -e
+  ## chcon --reference="$source" "$target" # typicall not available on arch linux
 }
 
 # Function to update etc/fstab with a new subvolume entry
@@ -202,10 +200,8 @@ migrate_folder_to_flat_subvolume() {
       # This directory will serve as the mount point for the new top-level subvolume.
       mkdir "$SOURCE"
       # Migrate owner, permissions, and SELinux context from the temporary directory to the new empty directory
-      chown --reference="$SOURCE"_temp "$SOURCE"
-      chmod --reference="$SOURCE"_temp "$SOURCE"
-      ## chcon --reference="$SOURCE"_temp "$SOURCE"
-        return 0
+      migrate_permissions "${SOURCE}_temp" "$SOURCE"
+      return 0
     fi
     return 1
   else

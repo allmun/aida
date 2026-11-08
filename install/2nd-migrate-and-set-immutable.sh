@@ -5,6 +5,10 @@
 
 set -e
 
+# #########################################################################################
+# Check conditions for running this cripts
+# #########################################################################################
+
 # Check if script is executed from the expected folder
 [[ "$PWD" == */aida/install ]]  || {
     echo "Error: This script mist be executed from the 'aida/install'folder"
@@ -13,9 +17,10 @@ set -e
 
 # Ensure correct exection order of installation scripts
 if [[ ! -f "/var/aida/.done/1st-prepare-and-setup.sh" ]]; then
-    echo "Error: First run 'sudo bash 1st-prepare-and-setup.sh' first to ensure correct setup before runing this script"; 
+    echo "Error: First run 'sudo bash 1st-prepare-and-setup.sh' first to ensure correct setup before runing this script";
     exit 1
 fi
+
 # Prevent running this script muliple times
 if [ -f "/var/aida/.done/$0" ]; then
     echo "Error: All installation scripts executed"
@@ -23,70 +28,35 @@ if [ -f "/var/aida/.done/$0" ]; then
     exit 1
 fi
 
-# Check that the conditions for applying aida is fulfilled
-verbose="1"
-source "../lib/aida-lib.sh"
-
-# Include migration script
-source "../res/migration-libs.sh"
+# #########################################################################################
+# Temporarily mount @snapshots on /.snapshot
+# #########################################################################################
 
 # Get subvoume name, device name and uuid of mounted root partition
 mounted_root_subvol_name=$(findmnt / | tail -n 1 | awk -F'[][]' '{print $2}')
-mounted_root_device_name=$(mount | grep "/ " | awk -F' ' '{print $1}')
+mounted_root_device_name=$(mount | grep " / " | awk -F' ' '{print $1}')
 mounted_root_device_uuid=$(blkid "$mounted_root_device_name" | awk -F'UUID="' '{print $2}' | awk -F'"' '{print $1}')
-echo "Root: $mounted_root_subvol_name"
-echo "Root: $mounted_root_device_name"
-echo "Root: $mounted_root_device_uuid"
 
-# Get device name an uuid of mounted boot partition
-mounted_boot_subvol_name=$(findmnt /boot | tail -n 1 | awk -F'[][]' '{print $2}')
-mounted_boot_device_name=$(mount | grep "/boot " | awk -F' ' '{print $1}')
-mounted_boot_device_uuid=$(blkid "$mounted_boot_device_name" | awk -F'UUID="' '{print $2}' | awk -F'"' '{print $1}')
-echo "Boot: $mounted_boot_subvol_name"
-echo "Boot: $mounted_boot_device_name"
-echo "Boot: $mounted_boot_device_uuid"
+# mount /.snapshots
+mount -t btrfs -o subvol=@snapshots,defaults,noatime,compress=lzo "$mounted_root_device_name" "$snapshot_dir"
 
-# Get subvolume name, device name and uuid of mounted var partition
-mounted_var_subvol_name=$(findmnt /var | tail -n 1 | awk -F'[][]' '{print $2}')
-mounted_var_device_name=$(mount | grep "/var " | awk -F' ' '{print $1}')
-mounted_var_device_uuid=$(blkid "$mounted_var_device_name" | awk -F'UUID="' '{print $2}' | awk -F'"' '{print $1}')
-echo "/var: $mounted_var_subvol_name"
-echo "/var: $mounted_var_device_name"
-echo "/var: $mounted_var_device_uuid"
+# #########################################################################################
+# Create first snapshots and update according to declarative configuration
+# #########################################################################################
 
-# Variables needed by migration-libs.sh
-WD="$tmp_working_dir"
-BTRFS_UUID="$mounted_root_device_uuid"
-EDITOR="nano"
-# EDITOR="vim"
-
-# ##########################################################################################
-# Prepare system for migration of /var and /.snapshots by creating a new snapshot
-# ##########################################################################################
-
-# Create a new root snapshot for implementing migration of /.snapshots
+# Create snapshot
 echo ""
-echo "Info: Creating snapshot of current root / for migrating aida ..."
-# First, unmount any mounted snapshots
-umount "$sida_mnt_dir"
-# Then, craete new snapshot
-aida-create
+echo "Info: Creating first snapshot ..."
+unmount_aida_mnt
 
-# Remove root folder from etc/fstab:
-echo "Info: removing root partition / from $aida_mnt_dri/etc/fstab ..."
-sed -i "s|^UUID=<$mounted_root_device_uuid> / |# &|" "$aida_mnt_dir/etc/fstab"
+# Update snapshot to declared configuration
+echo ""
+echo "Info: Updating snapshot to declared configuration ..."
+update_root_subvol
 
-# Update fstab with a mount definition for /var which will be migrated to @var in later steps in this script
-echo "Info: Adding mount point for /var to $aida_mnt_dir/etc/fstab ..."
-add_fstab_entry "$aida_mnt_dir/etc/fstab" /var @var
-
-# Let the user inspect the generated fstab and correct any errors
-echo "Info: Mount point for /var added to $tmp_working_dir$mounted_root_subvol_name/etc/fstab"
-echo "Warning: Check that /var is correctly set up in $tmp_working_dir$mounted_root_subvol_name/etc/fstab"
-echo "Warning: Check that the line for the root partition / is converted to a comment in $tmp_working_dir$mounted_root_subvol_name/etc/fstab"
-echo "Warning: Check that there are no line for mounting /.snapshot in $tmp_working_dir$mounted_root_subvol_name/etc/tastab"
-read -rp "Please review the updated $tmp_working_dir$mounted_root_subvol_name/etc/fstab. Press Enter to continue..."
-$EDITOR "$aida_mnt_dir/etc/fstab"
+# #########################################################################################
+# Install initcpio hooks for (re)mounting root /, ./snapshots,and /etc overlay
+# #########################################################################################
 
 # Copy aida-mounts to etc/initcpio folders
 echo "Info: Copying aida-remounts hooks to $aida_mnt_diretc/initcpio folders ..."
@@ -99,47 +69,33 @@ echo "HOOKS+=(aida-mounts)" >> "$aida_mnt_dir/etc/mkinitcpio.conf"
 
 # Update initramfs to include aida-hooks
 echo "Info: Running mkinitcpio to genarate new initramfs that includes aida-mounts ..."
-aida-shell mkinitcpio -P
+run_chroot_shell_commands "mkinitcpio -P"
 
-# Switch to new snapshat in grub menu
-echo "Info: Preparing for switching to new snapshot by updating grub menu ..."
-aida-switch
+# Remove mount point defintion for root folder in etc/fstab:
+echo "Info: removing root partition / from $aida_mnt_dri/etc/fstab ..."
+sed -i "s|^UUID=<$mounted_root_device_uuid> / |# &|" "$aida_mnt_dir/etc/fstab"
 
-# ##########################################################################################
-# Migrate /var and /.snapshots folders
-# ##########################################################################################
+# #########################################################################################
+# Switch to new snapshot
+# # #########################################################################################
 
-# Mount root device in temporary folder
-mount UUID="$mounted_root_device_uuid" -o subvolid=5 "$tmp_working_dir"
-cd "$tmp_working_dir"
-
-# Migrate /.snapshots folder to seåarate btrfs subvolume
+# Update grub menu to point at new snapshot
 echo ""
-echo "Info: Migrating /.snapshots into a btrfs subvolume ..."
-migrate_folder_to_flat_subvolume /.snapshots @snapshots
+echo "Info: Updating grub menu to point to snapshot"
+switch_to_new_snapshot
 
-# Migrate /var folder to separate btrfs subvolumes
-echo ""
-echo "Info: Migrating folders /var into a btrfs subvolume ..."
-migrate_folder_to_flat_subvolume /var @var
+# #########################################################################################
+# Finish and exit
+# # #########################################################################################
 
-# Show resulting btrfs subvolumes
-show_subvolumes
-
-# Mount /var according to new fstab (do not terminate if unsuccessful)
-echo ""
-echo "Info: Trying to mount /@var on /var ..."
-set +e
-mount /var
-set -e 
-
-# Mark this script as executed
+# Mark this script as executed (it is premature but cannot be done after migration and before reboot)
 mkdir -p /var/aida/.done
 touch "/var/aida/.done/$0"
 
 # Done
 echo ""
-echo "Info: All migration done"
-echo "Warning: The system may be unstable after migrating the /var folder but should become stable again after rebooting"
-echo "REBOOT NOW to make changes permanent"
+echo "Info: 1st step complete."
 
+echo ""
+echo "REBOOT NOW and afterwards run 'sudo bash 2nd-migrate-and-set-immutable.sh' to continue installation."
+echo ""
