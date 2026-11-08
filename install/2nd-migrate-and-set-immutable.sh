@@ -12,8 +12,8 @@ set -e
 }
 
 # Ensure correct exection order of installation scripts
-if [[ ! -f ]]"/var/aida/.done/1st-prepare-and-setup.sh" ]]; then
-    echo "Error: Fisst run 'sudo bash 1st-prepare-and-setup.sh' first to ensure correct setup before runing this script"; 
+if [[ ! -f "/var/aida/.done/1st-prepare-and-setup.sh" ]]; then
+    echo "Error: First run 'sudo bash 1st-prepare-and-setup.sh' first to ensure correct setup before runing this script"; 
     exit 1
 fi
 # Prevent running this script muliple times
@@ -67,11 +67,14 @@ EDITOR="nano"
 # Create a new root snapshot for implementing migration of /.snapshots
 echo ""
 echo "Info: Creating snapshot of current root / for migrating aida ..."
+# First, unmount any mounted snapshots
+umount "$sida_mnt_dir"
+# Then, craete new snapshot
 aida-create
 
 # Remove root folder from etc/fstab:
 echo "Info: removing root partition / from $aida_mnt_dri/etc/fstab ..."
-sed -i "s|^UUID=<$mounted_root_device_uuid> / |# &|" /etc/fstab
+sed -i "s|^UUID=<$mounted_root_device_uuid> / |# &|" "$aida_mnt_dir/etc/fstab"
 
 # Update fstab with a mount definition for /var which will be migrated to @var in later steps in this script
 echo "Info: Adding mount point for /var to $aida_mnt_dir/etc/fstab ..."
@@ -79,11 +82,11 @@ add_fstab_entry "$aida_mnt_dir/etc/fstab" /var @var
 
 # Let the user inspect the generated fstab and correct any errors
 echo "Info: Mount point for /var added to $tmp_working_dir$mounted_root_subvol_name/etc/fstab"
-echo "Warning: Check that /var is correct set up in $tmp_working_dir$mounted_root_subvol_name/etc/fstab"
+echo "Warning: Check that /var is correctly set up in $tmp_working_dir$mounted_root_subvol_name/etc/fstab"
 echo "Warning: Check that the line for the root partition / is converted to a comment in $tmp_working_dir$mounted_root_subvol_name/etc/fstab"
 echo "Warning: Check that there are no line for mounting /.snapshot in $tmp_working_dir$mounted_root_subvol_name/etc/tastab"
 read -rp "Please review the updated $tmp_working_dir$mounted_root_subvol_name/etc/fstab. Press Enter to continue..."
-$EDITOR "$tmp_working_dir$mounted_root_subvol_name/etc/fstab"
+$EDITOR "$aida_mnt_dir/etc/fstab"
 
 # Copy aida-mounts to etc/initcpio folders
 echo "Info: Copying aida-remounts hooks to $aida_mnt_diretc/initcpio folders ..."

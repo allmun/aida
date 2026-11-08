@@ -5,27 +5,32 @@
 
 set -e
 
+if [[ ! -d "/var/aida/.done" ]]; then
+    echo "Run 'sudo bash 1st-prepare-and-setup.sh' first to ensure correct setup before runing this script"; 
+    exit 1
+fi
 # Ensure correct exection order of installation scripts
-if [[ ! -f "/var/aida/.done/1st-boot-initial-prepare.sh" ]]; then
-    echo "Run 'sudo bash 1st-boot-initial-prepare.sh' first to ensure correct setup before runing this script"; 
-    exit 1
-fi
-if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then
-    echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' first to ensure correct setup before runing this script"; 
-    exit 1
-fi
-if [[ ! -f "/var/aida/.done/3rd-boot-install-aida.sh" ]]; then
-    echo "Run 'sudo bash 3rd-boot-install-aida.sh' first to ensure correct setup before runing this script"; 
-    exit 1
-fi
-if [[ ! -f "/var/aida/.done/4th-boot-create-snapshots.sh" ]]; then
-    echo "Run 'sudo bash 4th-boot-create-snapshots.sh' first to ensure correct setup before runing this script"; 
-    exit 1
-fi
-if [[ ! -f "/var/aida/.done/5th-boot-make-immutable.sh" ]]; then
-    echo "Run 'sudo bash 5th-boot-make-immutable.sh' first to ensure correct setup before runing this script"; 
-    exit 1
-fi
+#if [[ ! -f "/var/aida/.done/1st-prepare-and-setup.sh" ]]; then
+#    echo "Run 'sudo bash 1st-prepare-and-setup.sh' first to ensure correct setup before runing this script"; 
+#    exit 1
+#fi
+# Below steps are no longer needed:
+#if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then
+#    echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' first to ensure correct setup before runing this script"; 
+#    exit 1
+#fi
+#if [[ ! -f "/var/aida/.done/3rd-boot-install-aida.sh" ]]; then
+#    echo "Run 'sudo bash 3rd-boot-install-aida.sh' first to ensure correct setup before runing this script"; 
+#    exit 1
+#fi
+#if [[ ! -f "/var/aida/.done/4th-boot-create-snapshots.sh" ]]; then
+#    echo "Run 'sudo bash 4th-boot-create-snapshots.sh' first to ensure correct setup before runing this script"; 
+#    exit 1
+#fi
+#if [[ ! -f "/var/aida/.done/5th-boot-make-immutable.sh" ]]; then
+#    echo "Run 'sudo bash 5th-boot-make-immutable.sh' first to ensure correct setup before runing this script"; 
+#    exit 1
+#fi
 
 if [ "$EUID" -ne 0 ]; then
   echo "This script must be run as root"

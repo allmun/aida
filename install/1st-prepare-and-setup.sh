@@ -6,6 +6,7 @@
 set -e
 
 # Check if script is executed from the expected folder
+aida_install_dir="$PWD"
 [[ "$PWD" == */aida/install ]]  || {
     echo "Error: This script mist be executed from the 'aida/install'folder"
     exit 1
@@ -41,6 +42,15 @@ aida_mnt_dir="$aida_var_dir/mnt"
 mkdir -p "$tmp_working_dir"
 mkdir -p "$snapshot_dir"
 mkdir -p "$aida_mnt_dir"
+mkdir -p "$aida_var_dir/.done"
+
+# Get subvoume name, device name and uuid of mounted root partition
+mounted_root_subvol_name=$(findmnt / | tail -n 1 | awk -F'[][]' '{print $2}')
+mounted_root_device_name=$(mount | grep "/ " | awk -F' ' '{print $1}')
+mounted_root_device_uuid=$(blkid "$mounted_root_device_name" | awk -F'UUID="' '{print $2}' | awk -F'"' '{print $1}')
+echo "Root: $mounted_root_subvol_name"
+echo "Root: $mounted_root_device_name"
+echo "Root: $mounted_root_device_uuid"
 
 # Create important symbolic links
 sysrootlnk="/sysroot"
@@ -55,7 +65,7 @@ if [[ -L "$sysrootlnk" || -d "$sysrootlnk" || -f "$sysrootlnk" ]]; then
     fi
 else
     # neither link, folder, or file with this name exist
-    echo "Info: Creating symbolic link $sysrootlnk" -> "$sysroottgt"
+    echo "Info: Creating symbolic link $sysrootlnk -> $sysroottgt"
     ln -s "$sysrootlnk" "$sysroottgt"
 fi
 
@@ -66,26 +76,29 @@ pacman -Syu --noconfirm --needed btrfs-progs grub-btrfs inotify-tools
 
 # If root file system is writable, start grub-btrfs, otherwise check if we can proceed
 echo ""
-echo "Info: Enabling grub-btrfsd.service
+echo "Info: Enabling grub-btrfsd.service"
 if [ -n "$(grep ' / ' /proc/mounts | grep "[[:space:]]rw[[:space:],]")" ]; then
-  # Root file system is read-write"
-  # Enable and start grub-btrfs system service
-  systemctl enable --now grub-btrfsd.service
+    # Root file system is read-write"
+    # Enable and start grub-btrfs system service
+    echo "Info: Enabling grub-btrfsd.service ..."
+    systemctl enable --now grub-btrfsd.service
 else
-  # Root file system is read-only
-  # Check if dependencies are installed
-  if [ -z "$(pacman -Qs btrfs-progs)" ]; then
-    echo "Error: btrfs-progs is needed but installed on read-only root file system"
-    exit 1
-  fi
-  if [ -z "$(pacman -Qs grub-btrfs)" ]; then
-    echo "Error: grub-btrfs is needed but installed on read-only root file system"
-    exit 1
-  fi
-  echo "Info: Root file system is read-only but dependencies are installed"
+    # Root file system is read-only
+    # Check if dependencies are installed
+    if [ -z "$(pacman -Qs btrfs-progs)" ]; then
+        echo "Error: btrfs-progs is needed but installed on read-only root file system"
+        exit 1
+    fi
+    if [ -z "$(pacman -Qs grub-btrfs)" ]; then
+        echo "Error: grub-btrfs is needed but installed on read-only root file system"
+        exit 1
+    fi
+    echo "Info: Root file system is read-only but dependencies are installed"
 fi
 
 # Install aida binaries, librararies, etc by running update-installation.sh:
+echo ""
+echo "Info: calling script to install binaries etc ..."
 bash ./update-installation.sh
 
 # Replace default configuration to existing system configuration
@@ -95,16 +108,55 @@ echo "Info: Generating aida declarative configuration from existing system confi
 # TODO generate system.services
 # TODO generate user.services
 
+# Mount root device in temporary folder for creation of @snapshots subvolume
+mount UUID="$mounted_root_device_uuid" -o subvolid=5 "$tmp_working_dir"
+cd "$tmp_working_dir"
+if [[ -z "$(findmnt | grep '@snapshots' )" ]]; then
+    btrfs subvolume create @snapshots 
+    if [[ -d /.snapshots ]]; then
+        mv /.snapshots "/.snapshots_backup_$(date +%Y%m%d%H%M%S)"
+    fi
+    mkdir -p /.snapshots    
+    mount -U "$mounted_root_device_uuid" -o subvol=/@snapshots,defaults,noatime,compress=lzo /.snapshots
+fi
+# Go back to .../aida/install
+cd "$aida_install_dir"
+
+# Safe unmmounting of /var/aida/mnt folder
+unmount_aida_mnt() {
+    if [[ ! -d "$aida_mnt_dir" ]]; then
+        echo "Error: $aida_mnt_dir does not exist"
+        exit 1
+    fi
+    if  [[ ! -d "$aida_mnt_dir/etc" ]]; then 
+        echo "Warning: Cannot unmmount $aida_mnt_dir non-mounted folder"
+    else
+        echo "Info: Unmounting $aida_mnt_dir"
+        cleanup_chroot
+        umount "$aida_mnt_dir"
+    fi
+}
+
 # Create two snapshots of the current root (one for an unmodified fallback and one for installint aida)
 echo ""
 echo "Info: Creating fallback snapshot of current root /"
-aida-create
-umount "$aida_mnt_dir"
+unmount_aida_mnt
+#Crate new snapshot
+mount_root_subvol
+echo ""
 echo "Info: Creating snapshot of current root / for installing aida"
-aida-create
+unmount_aida_mnt
+#Crate new snapshot
+mount_root_subvol
+
 # Run declarative updater to verify that it works
+echo ""
 echo "Info: Running aida-update to update system software to update aida declaration..."
 aida-update
+
+# Remove root folder from etc/fstab - TODO : test that this step works...
+echo "Info: removing root partition / from $aida_mnt_dri/etc/fstab ..."
+sed -i "s|^UUID=<$mounted_root_device_uuid> / |# &|" "$aida_mnt_dir/etc/fstab"
 
 # Switch to new snapshat in grub menu
 echo ""
@@ -118,6 +170,7 @@ touch "/var/aida/.done/$0"
 # Done
 echo ""
 echo "Info: 1st step complete."
+
 echo ""
-echo "Reboot and Run 'sudo bash 2nd-migrate-and-set-immutable.sh' to continue installation."
+echo "REBOOT NOW and run 'sudo bash 2nd-migrate-and-set-immutable.sh' to continue installation."
 echo ""
