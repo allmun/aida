@@ -5,10 +5,17 @@
 
 set -e
 
+# Ensure correct exection order of installation scripts
+if [[ ! -f ]]"/var/aida/.done/1st-boot-initial-prepare.sh" ]]; then
+    echo "Run 'sudo bash 1st-boot-initial-prepare.sh' first to ensure correct setup before runing this script"; exit 1
+fi
+if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then
+    echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' first to ensure correct setup before runing this script"; exit 1
+fi
 # Prevent running this script muliple times
 if [ -f "/var/aida/.done/$0" ]; then
     echo ""; echo "$0 has already been executed"
-    if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then 
+    if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then
         echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' to continue installation"; exit 1
     fi
     if [[ ! -f "/var/aida/.done/3rd-boot-install-aida.sh" ]]; then

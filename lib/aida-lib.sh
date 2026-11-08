@@ -120,7 +120,7 @@ create_info_xml() {
     local updated_from="$1"
     local snapshot_name="$2"
     local target="$snapshot_dir/$snapshot_name/info.xml"
-    local datetime="$(name_to_date $snapshot_name)"
+    local datetime="$(name_to_datetime $snapshot_name)"
     echo '<?xml version="1.0"?>' > "$target"
     echo "<snapshot>" >> "$target"
     echo "   <type>single</type>" >> "$target"
@@ -131,25 +131,25 @@ create_info_xml() {
     echo "</snapshot>" >> "$target"
 }
 
-# Update fstab to point to new snapshot
-update_snapshot_fstab() {
-    local new_snapshot_name=$1
-    local filename="$aida_mnt_dir/etc/fstab"
-    if [ -z "$(grep /.snapshots/ $filename)" ]; then
-        # No snapshots found in existing fstab of the snapshot
-        sed -i "s|subvol=/@,|subvol=/@snapshots/$new_snapshot_name/snapshot,|" "$filename"
-        # Add an overlay for /etc in fstab for snapshot
-        lower_dir_str="lowerdir=/etc"
-        upper_dir_str="upperdir=/@snapshots/$new_snapshot_name/overlay/etc"
-        work_dir_str="workdir=/@snapshots/$new_snapshot_name/workdir/etc"
-        #systemd_req_str=",x-systemd.requires=/.snapshots.mount" # there is no such thing!
-        overlay_str="overlay /etc overlay noauto,nofail,$lower_dir_str,$upper_dir_str,$work_dir_str 0 0"
-        echo "$overlay_str" >> "$filename"
-    else
-        # Replace references to old snapshot to new snapshot for all occurances in fstab
-        sed -i "s|/@snapshots/[0-9]\{14\}/|/@snapshots/$new_snapshot_name/|g" "$filename"
-    fi
-}
+# Update fstab to point to new snapshot - this is no longer needed (the aida-mounts initcpio will take care of mounting mounting the snapshot
+#update_snapshot_fstab() {
+#    local new_snapshot_name=$1
+#    local filename="$aida_mnt_dir/etc/fstab"
+#    if [ -z "$(grep /.snapshots/ $filename)" ]; then
+#        # No snapshots found in existing fstab of the snapshot
+#        sed -i "s|subvol=/@,|subvol=/@snapshots/$new_snapshot_name/snapshot,|" "$filename"
+#        # Add an overlay for /etc in fstab for snapshot
+#        lower_dir_str="lowerdir=/etc"
+#        upper_dir_str="upperdir=/@snapshots/$new_snapshot_name/overlay/etc"
+#        work_dir_str="workdir=/@snapshots/$new_snapshot_name/workdir/etc"
+#        #systemd_req_str=",x-systemd.requires=/.snapshots.mount" # there is no such thing!
+#        overlay_str="overlay /etc overlay noauto,nofail,$lower_dir_str,$upper_dir_str,$work_dir_str 0 0"
+#        echo "$overlay_str" >> "$filename"
+#    else
+#        # Replace references to old snapshot to new snapshot for all occurances in fstab
+#        sed -i "s|/@snapshots/[0-9]\{14\}/|/@snapshots/$new_snapshot_name/|g" "$filename"
+#    fi
+#}
 
 # Create a snapshot from existing snapshot or from current root
 create_snapshot_from() {
@@ -162,33 +162,20 @@ create_snapshot_from() {
     local snapshot_name=$(date +%Y%m%d%H%M%S)
     local snapshot_full_name="$snapshot_dir/$snapshot_name/snapshot"
     # Create folders and info.xml for new snapshot
-echo "B1"
     mkdir -p "$snapshot_dir/$snapshot_name/overlay/etc"
-echo "B2"
     mkdir -p "$snapshot_dir/$snapshot_name/workdir/etc"
-    #create_info_xml "$mounted_root_device_name" "$snapshot_name"
     create_info_xml "$old_snapshot_name" "$snapshot_name"
-echo "B3"
     # Create btrfs snapshot of currently booted root file system
-echo "$old_snapshot_full_name"
-echo "$snapshot_full_name"
     btrfs subvolume snapshot "$old_snapshot_full_name" "$snapshot_full_name"
-echo "B4"
     # Mount new snapshot on working directory
     [[ -n "$(findmnt $aida_mnt_dir)" ]] && umount "$aida_mnt_dir"
     mount --bind "$snapshot_full_name" "$aida_mnt_dir"
-echo "MNT: $(findmnt $aida_mnt_dir)"
-echo "B5"
-    # Update fstab for the new snapshot
-    #update_snapshot_fstab "$mounted_root_subvol_name" "$snapshot_name"
-    update_snapshot_fstab "$snapshot_name"
-echo "B6"
+#    # Update fstab for the new snapshot # no longer needed
+#    update_snapshot_fstab "$snapshot_name" # no longer needed
     # Show content of mounted snapshot:
     verbose_ls "$aida_mnt_dir"
-echo "B7"
     # Show that a new snapshot was created (even if verbose is off)
     verbose_echo "A new snapshot $snapshot_name was created and mounted on $aida_mnt_dir"
-echo "B8"
     return 0
 }
 

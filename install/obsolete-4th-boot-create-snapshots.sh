@@ -5,10 +5,20 @@
 
 set -e
 
+# Ensure correct exection order of installation scripts
+if [[ ! -f ]]"/var/aida/.done/1st-boot-initial-prepare.sh" ]]; then
+    echo "Run 'sudo bash 1st-boot-initial-prepare.sh' first to ensure correct setup before runing this script"; exit 1
+fi
+if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then
+    echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' first to ensure correct setup before runing this script"; exit 1
+fi
+if [[ ! -f "/var/aida/.done/3rd-boot-install-aida.s" ]]; then
+    echo "Run 'sudo bash 3rd-boot-install-aida.sh' first to ensure correct setup before runing this script"; exit 1
+fi
 # Prevent running this script muliple times
 if [ -f "/var/aida/.done/$0" ]; then
     echo ""; echo "$0 has already been executed"
-    if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then 
+    if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then
         echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' to continue installation"; exit 1
     fi
     if [[ ! -f "/var/aida/.done/3rd-boot-install-aida.sh" ]]; then
@@ -39,29 +49,32 @@ fi
 verbose="1"
 source "../lib/aida-lib.sh"
 
-echo ""
-echo "Intalling dependencies ..."
-pacman -Syu --noconfirm
-pacman -Syu --noconfirm btrfs-progs grub-btrfs inotify-tools
 
-# Create important folders
-mkdir -p /.snapshots
-mkdir -p /var/aida/mnt
+# Code create new snapshot and run a software update
+echo "Creating new snapshot ..."
+aida-create
 
-echo ""
-echo "Starting services ..."
-systemctl enable grub-btrfsd
+echo "Updating software in new snapshot in chroot"
+aida-update
 
-# Start grub-btrfsd service
-systemctl start grub-btrfsd.service
+# Start grub-btrfsd deamon needed for adding snapshots to grub menu
+systemctl enable --now grub-btrfsd
+
+# Create a snapshot of the current root
+echo "Enable new snapshot in grub menu ..."
+aida-create
+
+echo "Updating: Running sw update ..."
+aida-update
+
+echo "Switching: Running grub-mkconfig ..."
+aida-switch
 
 # Mark this script as executed
 mkdir -p /var/aida/.done
 touch "/var/aida/.done/$0"
 
-# Done
 echo ""
-echo "1st step complete."
+echo "All done".
 echo ""
-echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' to continue installation."
-echo ""
+echo "Reboot now to make changes permanent and run 'sudo bash 5th-boot-make-immutable' after the rebooting"

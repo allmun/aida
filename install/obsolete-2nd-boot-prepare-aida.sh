@@ -5,10 +5,14 @@
 
 set -e
 
+# Ensure correct exection order of installation scripts
+if [[ ! -f ]]"/var/aida/.done/1st-boot-initial-prepare.sh" ]]; then
+    echo "Run 'sudo bash 1st-boot-initial-prepare.sh' first to ensure correct setup before runing this script"; exit 1
+fi
 # Prevent running this script muliple times
 if [ -f "/var/aida/.done/$0" ]; then
     echo ""; echo "$0 has already been executed"
-    if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then 
+    if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then
         echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' to continue installation"; exit 1
     fi
     if [[ ! -f "/var/aida/.done/3rd-boot-install-aida.sh" ]]; then
@@ -42,7 +46,7 @@ echo ""
 echo "Starting steps to prepare for aida ..."
 
 # Include migration script
-source ./migration-libs.sh
+source ../res/migration-libs.sh
 
 # Craete important folders
 tmp_working_dir="/mnt"
@@ -113,9 +117,13 @@ mount UUID="$mounted_root_device_uuid" -o subvolid=5 "$tmp_working_dir"
 cd "$tmp_working_dir"
 
 # Migrate /.snapshots
-echo "Migrating /.snapshots ..."
+#echo "Migrating /.snapshots ..."
 migrate_folder_to_flat_subvolume /.snapshots @snapshots
-add_fstab_entry /etc/fstab /.snapshots @snapshots
+# Add fstab entry (will no longer be needed)
+#add_fstab_entry /etc/fstab /.snapshots @snapshots
+# Reaplaced by initcpio hooks:
+# TODO
+# check if exist: sudo btrfs subvolume list / | grep 'level 5 path @snapshots'
 
 # Migrate /var
 echo "Migrating /var"

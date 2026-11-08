@@ -8,7 +8,7 @@ set -e
 # Prevent running this script muliple times
 if [ -f "/var/aida/.done/$0" ]; then
     echo ""; echo "$0 has already been executed"
-    if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then 
+    if [[ ! -f "/var/aida/.done/2nd-boot-prepare-aida.sh" ]]; then
         echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' to continue installation"; exit 1
     fi
     if [[ ! -f "/var/aida/.done/3rd-boot-install-aida.sh" ]]; then
@@ -39,32 +39,44 @@ fi
 verbose="1"
 source "../lib/aida-lib.sh"
 
-# Create and mount new snapshot
-echo "Creating snapshot ..."
-mount_root_subvol
-
-# In /etc/fstab make root partition read-only:
-sed -Ei.bak \
-  '/^[[:space:]]*[^#[:space:]]+[[:space:]]+\/[[:space:]]+[^[:space:]]+[[:space:]]+/ s/^([[:space:]]*[^#[:space:]]+[[:space:]]+\/[[:space:]]+[^[:space:]]+[[:space:]]+)([^[:space:]]+)/\1\2,ro/' \
-  /var/aida/mnt/etc/fstab
-
-# Allow the user to inspect the generated fstab
 echo ""
-echo "Created /etc/fstab.bak"
-echo "Added 'ro' to root partition in /etc/fstab:"
-echo "$(grep '/ ' /var/aida/mnt/etc/fstab)"
-read -rp "Please, review entire /etc/fstab. Press Enter to continue..."
-# Open /etc/fstab in the nano text editor:
-nano /var/aida/mnt/etc/fstab
+echo "Intalling dependencies ..."
+pacman -Syu --noconfirm
+pacman -Syu --noconfirm btrfs-progs grub-btrfs inotify-tools
 
-# Swithc to new snapshot by updating the grub menu
-switch_to_new_snapshot
+# Create important folders
+mkdir -p /.snapshots
+mkdir -p /var/aida/mnt
+
+# Create sysroot link pointing to root
+sysrootlnk="/sysroot"
+sysroottgt="/"
+if [[ -L "$sysrootlnk" && -e "$sysroottgt" ]]; then
+    echo "The symbolic link $sysrootlnk exists and points to the valid target $sysroottgt."
+else
+    if [[ -L "$sysrootlnk" || -d "$sysrootlnk" || -f "$sysrootlnk" ]]; then
+        echo "The symbolic link either does not exist or points to an invalid target."
+        echo "Cannot conatinue without symbolic link $sysrootlnk -> $sysroottgt"
+        exit 1
+    else
+        ln -s "$sysrootlnk" "$sysroottgt"
+    fi
+fi
+
+echo ""
+echo "Starting services ..."
+systemctl enable grub-btrfsd
+
+# Start grub-btrfsd service
+systemctl start grub-btrfsd.service
 
 # Mark this script as executed
 mkdir -p /var/aida/.done
 touch "/var/aida/.done/$0"
 
+# Done
 echo ""
-echo "All done".
+echo "1st step complete."
 echo ""
-echo "Reboot now to make changes permanent"
+echo "Run 'sudo bash 2nd-boot-prepare-aida.sh' to continue installation."
+echo ""

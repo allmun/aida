@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# target: /etc/initcpio/install/etc-overlay
+
+build() {
+    add_runscript
+    add_binary /usr/bin/blkid
+}
+
+help() {
+    cat <<'EOF'
+Mount the selected snapshot's /etc overlay before switch_root.
+EOF
+}
