@@ -44,6 +44,7 @@ tmp_working_dir="/mnt"
 snapshot_dir="/.snapshots"
 aida_var_dir="/var/aida"
 aida_mnt_dir="$aida_var_dir/mnt"
+aida_config_dir="$aida_var_dir/config"
 
 # Craete important folders
 mkdir -p "$tmp_working_dir"
@@ -100,17 +101,20 @@ echo ""
 echo "Info: Generating aida declarative configuration from existing system configuration ..."
 
 # Generate pacman packages declarative configuration
-pacman -Qenq > "$aida_etc_folder/pacman.packages"
+pacman -Qenq > "$aida_config_dir/pacman.packages"
 
 # Generate systemd system services declarative configuration
-systemctl list-unit-files --type=service --state=enabled | awk '$1 ~ /\.service$/ { print $1 }' > "$aida_etc_folder/system.services"
+systemctl list-unit-files --type=service --state=enabled | awk '$1 ~ /\.service$/ { print $1 }' > "$aida_config_dir/system.services"
 
 # Generate systemd user services declarative configuration
-systemctl list-unit-files --type=service --state=enabled --user | awk '$1 ~ /\.service$/ { print $1 }' > "$aida_etc_folder/user.services"
+systemctl list-unit-files --type=service --state=enabled --user | awk '$1 ~ /\.service$/ { print $1 }' > "$aida_config_dir/user.services"
 
 # #########################################################################################
 # Migrate /var and /.snapshot folders
 # #########################################################################################
+
+# Include migration resource
+source "../res/migration-libs.sh"
 
 # Get subvoume name, device name and uuid of mounted root partition
 mounted_root_subvol_name=$(findmnt / | tail -n 1 | awk -F'[][]' '{print $2}')

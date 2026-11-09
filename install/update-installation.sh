@@ -5,7 +5,7 @@
 
 set -e
 
-if [[ "$@" != "1st-prepare-and-setup" && "$@" != "2nd-migrate-and-set-immutable.sh" ]]; then
+if [[ "$@" != "1st-prepare-and-setup.sh" && "$@" != "2nd-migrate-and-set-immutable.sh" ]]; then
     # Ensure correct exection order of installation scripts
     if [[ ! -f "/var/aida/.done/1st-prepare-and-setup.sh" ]]; then
         echo "Run 'sudo bash 1st-prepare-and-setup.sh' first to ensure correct setup before runing this script";
