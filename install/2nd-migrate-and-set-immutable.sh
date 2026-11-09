@@ -64,7 +64,10 @@ echo "Root: $mounted_root_subvol_name"
 echo "Root: $mounted_root_device_name"
 echo "Root: $mounted_root_device_uuid"
 # mount /.snapshots
-mount -t btrfs -o subvol=@snapshots,defaults,noatime,compress=lzo "$mounted_root_device_name" "$snapshot_dir"
+if [[ -z "$(findmnt $snapshot_dir)" ]]; then 
+    echo "Info: Mounting /.snapshots ..."
+    mount -t btrfs -o subvol=@snapshots,defaults,noatime,compress=lzo "$mounted_root_device_name" "$snapshot_dir"
+fi
 
 # #########################################################################################
 # Create first snapshots and update according to declarative configuration
@@ -89,6 +92,12 @@ echo "Info: Copying aida-remounts hooks to $aida_mnt_diretc/initcpio folders ...
 cp -v ../res/aida-mounts-install "$aida_mnt_dir/etc/initcpio/install/aida-mounts"
 cp -v ../res/aida-mounts-hooks "$aida_mnt_dir/etc/initcpio/hooks/aida-mounts"
 
+# Add poverlayfs to mkinitcpio configuration
+if [[ -z "$(cat $aida_mnt_dirt/etc/mkinitcpio.conf | grep 'MODULES+=(overlay)')" ]]; then
+    echo "Info: Adding aida-remounts to mkinitcpio configuration ..."
+    echo "MODULES+=(overlay)" >> "$aida_mnt_dir/etc/mkinitcpio.conf"
+fi
+
 # Add aida-mounts hooks to mkinitcpio configuration
 if [[ -z "$(cat $aida_mnt_dirt/etc/mkinitcpio.conf | grep 'HOOKS+=(aida-mounts)')" ]]; then
     echo "Info: Adding aida-remounts to mkinitcpio configuration ..."
@@ -100,8 +109,8 @@ echo "Info: Running mkinitcpio to genarate new initramfs that includes aida-moun
 run_chroot_shell_commands /usr/bin/mkinitcpio -P
 
 # Remove mount point defintion for root folder in etc/fstab:
-echo "Info: removing root partition / from $aida_mnt_dri/etc/fstab ..."
-sed -i "s|^UUID=<$mounted_root_device_uuid> / |# &|" "$aida_mnt_dir/etc/fstab"
+echo "Info: removing root partition / from $aida_mnt_dir/etc/fstab ..."
+sed -i "s|^UUID=$mounted_root_device_uuid / |# &|" "$aida_mnt_dir/etc/fstab"
 
 # #########################################################################################
 # Switch to new snapshot

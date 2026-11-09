@@ -56,8 +56,8 @@ run_latehook() {
         mount -t btrfs -o subvol=@snapshots,defaults,noatime,compress=lzo "$rootdev" "$snapmount"
         mount -t overlay overlay -o "lowerdir=$lowerdir,upperdir=$upperdir,workdir=$workdir" "$targetdir"
     else
-        echo "Cannot mount /@snapshots on /.snapshots"
-        echo "Cannot overlay /etc"
-        echo "Cannot switch to read-only root file system"
+        echo "etc-overlay: cannot mount /@snapshots on /.snapshots"
+        echo "etc-overlay: cannot overlay /etc"
+        echo "etc-overlay: cannot switch to read-only root file system"
     fi
 }
