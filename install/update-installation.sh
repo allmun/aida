@@ -5,6 +5,18 @@
 
 set -e
 
+if [[ "$@" != "1st-prepare-and-setup.sh" && "$@" != "2nd-migrate-and-set-immutable.sh" ]]; then
+    # Ensure correct exection order of installation scripts
+    if [[ ! -f "/var/aida/.done/1st-prepare-and-setup.sh" ]]; then
+        echo "Run 'sudo bash 1st-prepare-and-setup.sh' first to ensure correct setup before runing this script";
+        exit 1
+    fi
+    if [[ ! -f "/var/aida/.done/2nd-migrate-and-set-immutable.sh" ]]; then
+        echo "Run 'sudo bash 2nd-migrate-and-set-immutable.sh' first to ensure correct setup before runing this script";
+        exit 1
+    fi
+fi
+
 if [ "$EUID" -ne 0 ]; then
   echo "This script must be run as root"
   exit 1
@@ -76,5 +88,5 @@ else
         dstfile=${srcfile#/var/aida/bin/}
         ln -s $srcfile /var/aida/mnt/usr/local/bin/$dstfile
     done
-    echo "All update-aida done. Run 'aida-shell' or 'aida-update' and finally 'aida-switch' to make changes permanent".
+    echo "Updating of aida done"
 fi

@@ -2,6 +2,23 @@
 
 Atomic Immutable Declarative Archlinux
 
+## Latest news
+
+2026-11-09: Major redesign of installation process. Now, only two scripts (separated by a system reboot) are needed for installating aida. Also, mounting of  snapshots and the /etc overlays has been streamlined using initcpio hooks. 
+
+## Roadmap
+
+The following updates to the aida-manager is planned:
+
+- add m (Mounting) functionality to aida-manager ---status: todo
+- add s (Shell) functionality to aida-manager ---status: todo
+- add f (full update = clone/update/grub-switch) functionality to aida-manager ---status: todo
+- remove clear screen from print table function? ---status: todo
+- refactor code to string input instead of char input: get command from `${string:0:1}` and numbers from `${s:2}` ---status: todo
+- refactor code to preapare for CLI mode (only run loop if no arguments provided) ---status: todo
+
+After implementing the above updates to aida-manager, the aida-create, aida-shell, aida-switch, and aida-update may be depricated (to be decided).
+
 ## Warning
 
 The scripts in this project performs destructive operations on the file system. Major loss of date may result of their use. Systems may become unbootable in case of errors. Do NOT attempt to install aida on an existing production system. Only install aida on systems where data loss and risk of not being able to boot are acceptable. I take no responsibility for any direct or secondary effects.
@@ -31,10 +48,8 @@ The aida system only work with arch based systems. Other linux variants such as 
 
 The AUR (Arch User Repository) is not supported by aida. 
 Aida only supports the pacman package manager.
-It is possible to install AUR packages in the system space using the 'aida-shell', which create a chroot environment in which yay, paru and other package managers can be used.
-Aida will not touch such foreign packages during updates, so it's the responsibility of the user to manually perform such updates. 
-However, for security reasons, it is discouraged to use AUR packages at the system level.
-Instead, it is recommended to only install AUR packages in the user space using e.g. toolbx or distrobox.
+It is possible to install AUR packages in the system space using the 'aida-shell', which create a chroot environment in which yay, paru and other package managers can be used. Aida will not touch such foreign packages during updates, so it's the responsibility of the user to manually perform such updates. 
+However, for security reasons, it is discouraged to use AUR packages at the system level. Instead, it is recommended to only install AUR packages in the user space using e.g. toolbx or distrobox.
 
 ## Prerequisites
 
@@ -44,157 +59,59 @@ For aida to work, the file system must be set up accordingly:
 
 * / shall be on a btrfs partion. Aida does not work with any other types of file systems such as ext4 for the root partition.
 * /boot shall be on the same partions and subvolume as / for aida to work correcly. /boot shall therefore be an ordinary folder on the / file system.
-* /boot/efi   must be on a separate fat32 partition as in most contemporary linux systems. 512 MB is usually enough per system that is installaed.
-* /boot/grub  must be on a separate ext4 partition such that updates to grub and and grub-btrfs can be persisted for all snapshots. 
+* /boot/efi   must be on a separate fat32 partition as in most contemporary linux systems. 512 MB is usually enough per installed system.
+* /boot/grub  must be on a separate ext4 partition such that updates to grub and and grub-btrfs can be persisted for all snapshots. 512 MB should be enough.
 * /home must be on a separate partion or a separate btrfs subvolume.
 
-Other allways-writable folders such as /var will be migrated to separate btrfs subvolumes on the root partition by aida.
+Other allways-writable folders such as /var and /.snapshots will be migrated to separate btrfs subvolumes on the root partition by aida.
 
 Aida will finally create overlays for selected folder on the root file system such that systemd and other system tools can write or update necessary files to the system, e.g. the /etc folder.
+
+### Init systems
+
+Aida only support **systemd** based distributions. 
+
+Aida uses **mkinitcpio** for generating the initial ramdisk environment for booting the Linux kernel  that allows automatic mounting of /.snapshots, /etc, and / during the early boot phases. Other systems for generating initramfs such as 'dracut'  are not supported. 
 
 ## Installing aida
 
 ### Install arch linux
 
-Personally, I prefer the Calam-Arch-Installer (https://sourceforge.net/projects/blue-arch-installer/), which makes it very easy to install Arch linux. Ensure that git is installed as part of the system (otherwise, the aida files and folders must be transferred to the system using other methods).
+The Calam-Arch-Installer (https://sourceforge.net/projects/blue-arch-installer/) makes it very easy to install Arch linux in few guided steps. Another option is to use the official arch installer (https://archlinux.org/download/). Other arch based distributions such as CrashyOS, Garuda, Manjaro, Omarchy, etc have not been tested with aida. 
 
-After installation, open a terminal and run the following commands to get a working base configuration:
+Ensure that the file system layout is set up as described above.
 
-```
-pacman -Qenq > pacman.packages
-
-systemctl list-unit-files --type=service --state=enabled > system.services
-
-systemctl list-unit-files --type=service --state=enabled --user > user.services
-```
-
-Inspect the pacman.packages, systen.services, and user.services to verify that they contain a valid configuration (they should not be empty).
+Ensure that git is installed as part of the system (otherwise, the aida files and folders must be transferred to the system using other methods).
 
 ### Download aida
 
-Open a terminal and run the following command:
+Open a terminal and run the following commands:
 
 ```
 git clone https://github.com/allmun/aida.git
+
+cd aida/install
 ```
 
-### Update the configuration
+### Prepare and setup
 
-Change to the aida/config directory:
-
-```
-cd ./aida/config
-```
-
-This directory contains the default pacman.packages, system.services and user.services files.
-The default configuration may not be suitable for you.
-To overwrite the default files with the files obtained in step 'Install arch linux' run the following commands:
+Run the following command to check the system, create essential folders, install the required packages and services, and migrate folders to btrfs subvolumes:
 
 ```
-cp ../../mypacman.packages ./pacman.packages
-
-cp ../../mysystem.services ./system.services
-
-cp ../../myuser.services ./user.services
-```
-
-Notice that aida will remove any package or service that are not declared in the configuration files.
-
-Therefore, after copying, inspect the files in the aida/config folder to ensure that the configuration is valid.
-
-### Start aida installation
-
-Change to the aida/install directory:
-
-```
-cd ../config
-```
-
-### Initial preparation
-
-Run the following command to check the system and install the required packages and services:
-
-```
-sudo bash 1st-boot-initial-prepare.sh
-```
-
-Do NOT proceed if this steps fails! 
-
-Reboot the system before proceeding to next step of the installation procedure.
-
-### Prepare system
-
-Run the following command to prepare the system for aida:
-
-```
-sudo bash 2nd-boot-prepare-aida.sh
+sudo bash 1st-prepare-and-setup.sh
 ```
 
 This script will transform the file system and create necessary btrfs subvolumes. 
 
-In case of failing this step, the system may become extremely unstable and may not even be able to reboot! 
-
-The system may also become temporarily unstable due to the migration of the /var folder. After restarting the system, it should be stable again. 
-Therefore, do not do any unrelated work on the system at this stage but proceed with the installation of aida.
-
-Now, reboot the system before proceeding to next step of the installation procedure. 
+In case of failing this step, the system may become unstable and may not even be able to resart! The system may also become temporarily unstable due to the migration of the /var folder. After restarting the system, it should be stable again. Therefore, do not do any unrelated work on the system at this stage but proceed with the installation of aida as described below.
 
 Do NOT proceed if the configuration looks invalid or if this step fails.
 
-### Install aida files
-
-Run the following command to install the aida binaries, configuration, and libraries:
-
-```
-sudo bash 3rd-boot-install-aida.sh
-```
-
-It should be noticed that the aida framework is installed into subfolder of /var/aida. This is a bit unusual for linux systems but it is essentail that aida is available for all snapshots. There are other options for ensuring this, but using /var was chosen for simplicity.
-
-It is adviced to reboot the system before proceeding to the next step.
-
-Do NOT proceed if this steps fails! 
-
-### Create first snapshot
-
-Run the following command to create the first snapshot of the root file system, update the software, and switch to the new snapshot:
-
-```
-sudo bash 4th-boot-create-snapshots.sh
-```
-
-This script will update the /boot/grub/grub.cfg such that the system will boot into the new snapshot if the default boot option is selected in grub.
-
-### Make system immutable
-
-All the previous steps are performed on the system with an ordinary mutable/writable file system. The final installation step is therefore to make the system immutable, which is achieved by by running the following command:
-
-```
-sudo bash 5th-boot-make-immutable.sh
-```
-
-Reboot the system to make changes take effect.
-
-Known issue:
-
-The first boot on a new read-only snapshot may experience errors in the boot sequence because the system cannot write to the /etc folder, which initailly is read-only. Later in the boot sequence the /etc writable overlay is mounted such that subsequent writing to /etc can be done without problems. 
-It's highly recommended to reboot the system again before using the system for anything else. The second boot seems to go well. It's recommend to run 'journalctl -b' to check the boot log messages and to run 'journalctl -u etc.mount' to check if mounting of the /etc overlay went well. Finally, it is recommended to run 'findmnt' to inspect if / and /etc are mounted in the correct snapshot.
-
-## Future updates to the aida framework
-
-The installation scripts (1st-boot-initial-prepare.sh, 2nd-boot-prepare-aida.sh, 3rd-boot-install-aida.sh, 4th-boot-create-snapshots.sh, and 5th-boot-make-immutable.sh) shall only be executed once!
-
-Attempting to executing these scripts more than once may damange the linux system with potential data loss. The system may also become unbootable.
-
-Therefore, when changes are made to aida, only execute the update script:
-
-```
-sudo bash update-installation.sh
-```
-
-## Daily use of aida
+Reboot the system before proceeding to next step of the installation procedure.
 
 ### Workflow
+
+After installing aida, the system can only be updated in new snapshots. The following workflow process must be used for modifying or updating the system:
 
 1) Create new snapshot
 2) Modify the configuration
@@ -205,6 +122,8 @@ sudo bash update-installation.sh
 7) Reboot system
 8) Or use the aida-manager
 
+Step 1 creates a writable snapshot for that can be used for updating the system. Step 2 is used for adding, changing, or deleting software packages, systemd system and user services . Steps 3 is used for updating the system to the latest declaration. Step 4 can be used for modifying files in the snapshot. Step 5 can be used for performing chroot shell commands, e.g. adding or removing software packages using yay, paru, etc. Step 6 is used for setting the new snapshot as the default boot choice in the grub boot menu. Step 7 is used for letting the changes take effect. In step 8, the user can use the `aida-manager` to perform step 1,2,3, and 6 (steps 4, 5, and 7 are currently not implemted in aida-manager).
+
 ### Create new snapshots
 
 The following command will create a new snapshot of the root file system:
@@ -214,6 +133,8 @@ sudo aida-crate
 ```
 
 This command will create the snapshot but it will not perform an update or stage it for the next boot.
+
+Alternatively, the `c` (clone) command in the `aida-manager` can be used for creating a new snapshots from any of the existing snapshots.
 
 ### Modify configuration
 
@@ -230,6 +151,10 @@ sudo nano /var/aida/mnt/etc/aida/system.services
 sudo nano /var/aida/mnt/etc/aida/user.services
 ```
 
+The above commands require that a snapshot is mounted on /var/aida/mnt.
+
+Alternatively, the `e` (edit) command in the `aida-manager` can be used for editing the declarative configuration for any existing snapshot.
+
 ### Update snapshot
 
 The following command will perform a software update of the system using a chroot environment or the snapshot:
@@ -238,9 +163,9 @@ The following command will perform a software update of the system using a chroo
 sudo aida-update
 ```
 
-This command will update the software but it will not stage the update for the next boot.
+This command will update the software but it will not stage the update for the next boot. It is the responsibility of the user to inspect if the update ran without errors.
 
-It is the responsibility of the user to inspec if the update ran without errors.
+Alternatively, the `u` (update) command in the `aida-manager` can be used for updating the software packages and services for any existing snapshot.
 
 ### Modify snapshots
 
@@ -298,6 +223,8 @@ This command will update the /boot/grub/grub.cfg to point to the new snapshot.
 
 The user must reboot the system for the changes to take effect.
 
+Alternatively, the `g` (grub) command in the `aida-manager` can be used for switching to any existing snapshot.
+
 ### Using aida-manager
 
 To manage the system and the snapshots of the root file system , run the following command:
@@ -306,25 +233,97 @@ To manage the system and the snapshots of the root file system , run the followi
 sudo aida-manager
 ```
 
-In this utility, it is possbile to (c) create snapshots, (d) delete snapshots, (u) update snapshots, and updating (g) grub menu (switch to new snapshots).
+In this utility, it is possbile to q (quit), c (clone/copy snapshots), d (delete snapshots), u (update snapshots), g (switch to snapshot by updating the grub boot menu), and e (edit the declation files) 
 
-## Known issues
+#### Examples of using the aida-manager
 
-**001--2026-11-04: Snapshot deletion - Solved 2026-11-04**
+Below is shown an example of how the `aida-manager` can be used. In the example, the used has booted into snapshot 20261108090511 and created a clone 20261109130024. The user is then about to run a system update on the cloned snapshot by ussuing the `u 1` command:
 
-With the Delete command in `aida-manager` it is possible to delete snapshots. 
-The snapshots are intended to be deleted from /.snapshots. 
-However, the overlay and workdir folders can sometimes remain in /.snapshots. 
-This issue was fixed by updating the delete command in `aida-manager`.
-However, the fix will only remedy future deletions. 
-Older incomplete deletions must be cleanup manually by deleting the folders in /.-snapshots.
+```
+#     Date and Time          Root  Grub  Mount Name                
+------------------------------------------------------------
+1     2026-11-09 13:00:24                M     20261109130024      
+2     2026-11-08 09:05:11    R     G           20261108090511      
+3     2026-11-07 22:55:24                      20261107225524      
+4     2026-11-05 20:37:59                      20261105203759      
+5     2026-11-04 19:30:27                      20261104193027      
+6     2026-11-04 12:55:28                      20261104125528      
 
-**002--2026-11-04: Cannot delete stale snapshots - Accepted**
+Cloning snapshot: 1
 
-During experimental testing, it has been observed that the /@snapshots contains some snapshot folders containing the info.xml and the overlay and workdir folders but no acutal snapshots which was partially deleted, see issue 2026-11-04-001. The manualy cleanup procedure used in 2026-11-04-001 cannot be used for the @snapshot folder because it is set as read-only, which prevents any form of altering the content of the folder. It should be possible to clean up by (1) creating a new snapshot and set the root file system as writable, (2) reboot  into the new writable snapshot, (3) delete any garbage, (4) create yet another snapshot and set it read-only, (5) boot into the new read-only snapshot, (6) update `aida-manager` and use it to delete the temporary writable snapshot. However this proposed process has not been tested. Typicallay, these stale shapshot folders take up very little data, so it may be acceptable to keep them. 
+Actions: q (quit), c (clone), d (delete), u (update), g (grub) e (edit): u 1   
+```
 
+After running the update commands, the user then ussues the `g 1` command for updating the grub menu::
+
+```
+#     Date and Time          Root  Grub  Mount Name                
+------------------------------------------------------------
+1     2026-11-09 13:00:24                M     20261109130024      
+2     2026-11-08 09:05:11    R     G           20261108090511      
+3     2026-11-07 22:55:24                      20261107225524      
+4     2026-11-05 20:37:59                      20261105203759      
+5     2026-11-04 19:30:27                      20261104193027      
+6     2026-11-04 12:55:28                      20261104125528      
+
+Updated snapshot 20261109130024 (2026-11-09 13:00:24)
+
+Actions: q (quit), c (clone), d (delete), u (update), g (grub) e (edit): g 1     
+```
+
+After updating the grub menu, the user decides to some delete old snapshots:
+
+```
+#     Date and Time          Root  Grub  Mount Name                
+------------------------------------------------------------
+1     2026-11-09 13:00:24          G     M     20261109130024      
+2     2026-11-08 09:05:11    R                 20261108090511      
+3     2026-11-07 22:55:24                      20261107225524      
+4     2026-11-05 20:37:59                      20261105203759      
+5     2026-11-04 19:30:27                      20261104193027      
+6     2026-11-04 12:55:28                      20261104125528      
+
+Reboot to activate grub snapshot 20261109130024
+
+Swithced to snapshot 20261109130024 (2026-11-09 13:00:24)
+
+Actions: q (quit), c (clone), d (delete), u (update), g (grub) e (edit): d 4,5-6
+```
+
+The user is asked to confirm deletions of each snapshot:
+
+```
+Actions: q (quit), c (clone), d (delete), u (update), g (grub) e (edit): d 4,5-6    
+Delete snapshot 4 (20261105203759) [y/n]y
+Delete snapshot 5 (20261104193027) [y/n]y
+Delete snapshot 6 (20261104125528) [y/n]
+```
+
+After deletion, the following snapshots and status are shown in aida-manager:
+
+```
+#     Date and Time          Root  Grub  Mount Name                
+------------------------------------------------------------
+1     2026-11-09 13:00:24          G     M     20261109130024      
+2     2026-11-08 09:05:11    R                 20261108090511      
+3     2026-11-07 22:55:24                      20261107225524      
+
+Reboot to activate grub snapshot 20261109130024
+
+Deleted snapshot(s): 20261105203759 20261104193027 20261104125528
+
+Actions: q (quit), c (clone), d (delete), u (update), g (grub) e (edit): 
+```
+
+The user must q (quit)  aida-manager and reboot the system for the changes in the new snapshot to take effect (the deleted snapshot are gone forever and cannot be restored).
+
+# Known issues
+
+Installation script 1st-prepare-and-setup.sh seems to not add the correct systemd services to the declarative configuration. The user will be asked to r (remove), a (add), or i (ignore) the services during the system update. The user should take action a (add) to ensure that the required services are added to the declaration config files.
 
 ## Prototype versions
+
+2026-11-09: Major changes to the installation scripts implemented and tested in qemu. 
 
 2026-11-04: The prototype has been tested successfully on bare metal. 
 
