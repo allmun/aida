@@ -109,6 +109,20 @@ Do NOT proceed if the configuration looks invalid or if this step fails.
 
 Reboot the system before proceeding to next step of the installation procedure.
 
+### Create snapshot and set immutable
+
+Run the following command to create the first snapshot and set the system immutable:
+
+```
+sudo bash 2nd-migrate-and-set-immutable.sh
+```
+
+This script creates the first snapshot, updates the software packages and servicies according to the latest configuration. The script also install the initcpio hooks to automatically mount the snapshot and overlays during the early boot phases. The script finally updates the grub boot menu such that the new snapshot will be the default boot choice.
+
+Reboot the system for the changes to take effect.
+
+## Using aida
+
 ### Workflow
 
 After installing aida, the system can only be updated in new snapshots. The following workflow process must be used for modifying or updating the system:
@@ -317,7 +331,7 @@ Actions: q (quit), c (clone), d (delete), u (update), g (grub) e (edit):
 
 The user must q (quit)  aida-manager and reboot the system for the changes in the new snapshot to take effect (the deleted snapshot are gone forever and cannot be restored).
 
-# Known issues
+## Known issues
 
 Installation script 1st-prepare-and-setup.sh seems to not add the correct systemd services to the declarative configuration. The user will be asked to r (remove), a (add), or i (ignore) the services during the system update. The user should take action a (add) to ensure that the required services are added to the declaration config files.
 
