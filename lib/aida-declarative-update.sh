@@ -233,7 +233,6 @@ fi
 if (( ${#usrd_to_remove[@]} )); then
     while true; do
         echo "Found undeclared but enabled user services: ${usrd_to_remove[@]}"
-        read -p "User services - Remove, Add to declartion, or temporarily Ignore (r,a,i) " answer
         read -n 1 -p "Remove services, Add services to declartion, or temporarily Ignore these services (r,a,i) " answer
         case $answer in
             [rR]* )

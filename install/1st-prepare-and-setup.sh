@@ -98,18 +98,31 @@ bash ./update-installation.sh "1st-prepare-and-setup.sh"
 
 # Replace default configuration to existing system configuration
 echo ""
-echo "Info: Generating aida declarative configuration from existing system configuration ..."
+echo "Info: Aida can use the default declarative configuration or generate the declaration from the exising system configuration"
 
-# Generate pacman packages declarative configuration
-pacman -Qenq > "$aida_config_dir/pacman.packages"
+generate_declarative_config() {
+    # Generate pacman packages declarative configuration
+    pacman -Qenq > "$aida_config_dir/pacman.packages"
+    # Generate systemd system services declarative configuration
+    systemctl list-unit-files --type=service --state=enabled | awk '$1 ~ /\.service$/ { print $1 }' > "$aida_config_dir/system.services"
+    # Generate systemd user services declarative configuration
+    systemctl list-unit-files --type=service --state=enabled --user | awk '$1 ~ /\.service$/ { print $1 }' > "$aida_config_dir/user.services"
+}
 
-# Generate systemd system services declarative configuration
-systemctl list-unit-files --type=service --state=enabled | awk '$1 ~ /\.service$/ { print $1 }' > "$aida_config_dir/system.services"
-
-# Generate systemd user services declarative configuration
-systemctl list-unit-files --type=service --state=enabled --user | awk '$1 ~ /\.service$/ { print $1 }' > "$aida_config_dir/user.services"
-
-
+while true; do
+    read -n 1 -p "Action: Use d (default configuration) or g (generate from existing configuration) [d/g] " answer
+    case $answer in
+        [dD]* )
+            echo "Info: using default declarative confguration"
+            # nothing more todo: the files are already copied by the update-installation-script
+            break ;;
+        [gG]* )
+            echo "Info: Generating aida declarative configuration from existing system configuration ..."
+            generate_declarative_config
+            break ;;
+        # * ) echo "$1 (y/n) " ;;
+    esac
+done
 
 # #########################################################################################
 # Migrate /var and /.snapshot folders
