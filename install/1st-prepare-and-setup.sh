@@ -109,6 +109,8 @@ systemctl list-unit-files --type=service --state=enabled | awk '$1 ~ /\.service$
 # Generate systemd user services declarative configuration
 systemctl list-unit-files --type=service --state=enabled --user | awk '$1 ~ /\.service$/ { print $1 }' > "$aida_config_dir/user.services"
 
+
+
 # #########################################################################################
 # Migrate /var and /.snapshot folders
 # #########################################################################################
