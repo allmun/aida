@@ -110,6 +110,44 @@ systemctl list-unit-files --type=service --state=enabled | awk '$1 ~ /\.service$
 systemctl list-unit-files --type=service --state=enabled --user | awk '$1 ~ /\.service$/ { print $1 }' > "$aida_config_dir/user.services"
 
 # #########################################################################################
+# Move folders at / that must remain writable
+# #########################################################################################
+
+move_folder() {
+    local src="$1"
+    local dst="$2"
+    local bck="${dst}_backup"
+    local targe="$dst"
+    local lname="$src"    
+    
+    if [[ -z "$src" ]]; then
+        echo "Nothing to move: Folder $src does not exist"
+        return
+    fi
+    
+    if [[ ! -d "$src" ]]; then
+        echo "Nothing to move: The $src is not a regular folder"
+        return
+    fi
+    
+    if [[ -n "$dst" ]]; then
+        echo "Backing up $dst to $bck"
+        mv "$dst" "$bck"
+    fi
+    
+    mv "$src" "$dst"
+    ln -s "$target" "$lname"
+}
+
+echo ""
+echo "Moving and linking /mnt /opt /root /srv and /tmp to writable folder ..."
+move_folder /mnt /var/mnt
+move_folder /opt /var/opt
+move_folder /root /home/roothome
+move_folder /srv /var/srv
+move_folder /tmp /var/tmp
+
+# #########################################################################################
 # Migrate /var and /.snapshot folders
 # #########################################################################################
 

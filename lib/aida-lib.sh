@@ -243,6 +243,7 @@ prepare_chroot() {
   mount_bind "/boot/grub"
   mount_bind "/boot/efi"
   mount_bind "/var"
+  mount_bind "/home"
 }
 
 unmount_bind() {
@@ -270,6 +271,7 @@ cleanup_chroot() {
   unmount_bind "/boot/efi"
   unmount_bind "/boot/grub"
   unmount_bind "/var"
+  unmount_bind "/home"
 }
 
 # This function performs the declarative software update on the root snapshot on the mount point
