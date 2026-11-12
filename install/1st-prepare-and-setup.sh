@@ -111,6 +111,7 @@ generate_declarative_config() {
 
 while true; do
     read -n 1 -p "Action: Use d (default configuration) or g (generate from existing configuration) [d/g] " answer
+    printf "\n"
     case $answer in
         [dD]* )
             echo "Info: using default declarative confguration"
