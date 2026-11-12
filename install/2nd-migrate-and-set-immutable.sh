@@ -176,5 +176,5 @@ echo ""
 echo "Info: 2nd step complete."
 
 echo ""
-echo "REBOOT NOW and afterwards run 'sudo bash 2nd-migrate-and-set-immutable.sh' to continue installation."
+echo "REBOOT NOW and afterwards run 'sudo aida-manager' for using aida to manage snapshots."
 echo ""

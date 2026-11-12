@@ -4,6 +4,8 @@ Atomic Immutable Declarative Archlinux
 
 ## Latest news
 
+2026-11-12: Minor changes to installation process to enable the choice of using the default declarative configuration or generating the declarative configuration from the current system configuration.
+
 2026-11-09: Major redesign of installation process. Now, only two scripts (separated by a system reboot) are needed for installating aida. Also, mounting of  snapshots and the /etc overlays has been streamlined using initcpio hooks. 
 
 ## Roadmap
@@ -331,13 +333,44 @@ Actions: q (quit), c (clone), d (delete), u (update), g (grub) e (edit):
 
 The user must q (quit)  aida-manager and reboot the system for the changes in the new snapshot to take effect (the deleted snapshot are gone forever and cannot be restored).
 
+### Regarding the /etc folder
+
+Aida uses overlays for the /etc folder to allow the system to write any required information.
+It is not recommended for the user to make changes to /etc of the running snapshot because it could cause system crashes.
+
+Also, changes made to the /etc in one snapshot will not be copied to another snapshot.
+
+So, to make lasting changes to /etc it must be done in snapshot chroot environment.
+This is most easily done by using the aida-shell command followed by the aida-switch command.
+
+For example, if the user want to make changes to '/etc/fstab' and enable systemd 'mydaemon.service', the following process can be used:
+
+```
+sudo aida-create
+
+sudo aida-shell
+    # nano /etc/fstab
+    # systemctl enable mydaemon.service
+    # exit
+
+sudo aida-swich
+
+reboot
+```
+
+The changes will take effect after reboot
+
 ## Known issues
 
-Installation script 1st-prepare-and-setup.sh seems to not add the correct systemd services to the declarative configuration. The user will be asked to r (remove), a (add), or i (ignore) the services during the system update. The user should take action a (add) to ensure that the required services are added to the declaration config files.
+The installation scripts do not correctly add the systemd user.services to the declarative configuration.
+
+Work-around:  The user will be asked to r (remove), a (add), or i (ignore) the services during the system update. The user should take action a (add) to ensure that the required services are added to the declaration config files. 
 
 ## Prototype versions
 
-2026-11-09: Major changes to the installation scripts implemented and tested in qemu. 
+2026-11-12: Minor changes to installation process to enable the choice of using the default declarative configuration or generating the declarative configuration from the current system configuration.
+
+2026-11-09: Major redesign of installation process. Now, only two scripts (separated by a system reboot) are needed for installating aida. Also, mounting of  snapshots and the /etc overlays has been streamlined using initcpio hooks. 
 
 2026-11-04: The prototype has been tested successfully on bare metal. 
 
