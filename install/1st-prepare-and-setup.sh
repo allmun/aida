@@ -116,9 +116,7 @@ systemctl list-unit-files --type=service --state=enabled --user | awk '$1 ~ /\.s
 move_folder() {
     local src="$1"
     local dst="$2"
-    local bck="${dst}_backup"
-    local targe="$dst"
-    local lname="$src"    
+    local name="$3"
     
     if [[ -z "$src" ]]; then
         echo "Nothing to move: Folder $src does not exist"
@@ -129,23 +127,29 @@ move_folder() {
         echo "Nothing to move: The $src is not a regular folder"
         return
     fi
-    
-    if [[ -n "$dst" ]]; then
-        echo "Backing up $dst to $bck"
-        mv "$dst" "$bck"
+
+    if [[ -n "$(findmnt $src)" ]]; then
+        echo "Nopthing to move: The $src is a mount point"
+        return
     fi
     
+    if [[ -d "$dst" ]]; then
+        echo "Backing up $dst to ${dst}_backup"
+        mv "$dst" "${dst}_backup"
+    fi
+
     mv "$src" "$dst"
-    ln -s "$target" "$lname"
+    ln -s "$dst" "$src"
 }
 
 echo ""
 echo "Moving and linking /mnt /opt /root /srv and /tmp to writable folder ..."
-move_folder /mnt /var/mnt
+move_folder /mnt /var/rootmnt
 move_folder /opt /var/opt
-move_folder /root /home/roothome
+move_folder /root /home/root
 move_folder /srv /var/srv
-move_folder /tmp /var/tmp
+move_folder /usr/local /var/usrlocal
+move_folder /usr/tmp /var/usrtmp
 
 # #########################################################################################
 # Migrate /var and /.snapshot folders
