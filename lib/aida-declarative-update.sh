@@ -77,13 +77,13 @@ for name in "${!declared_pkgs[@]}"; do
 done
 
 # Get list of packagage to remove (ignore packages that are installed as part of groups)
-for name in "${!installed[@]}"; do
+for name in "${!installed_pkgs[@]}"; do
     # If group_pkgs[name] is defined, get its value, otherwise it's ""
     group="${group_pkgs[$name]+"${group_pkgs[$name]}"}"
     # Skip packages that are installed as part of a declared package
-    [[ "$group" != "" && ${declared["$group"]+yes} ]] && continue
+    [[ "$group" != "" && ${declared_pkgs["$group"]+yes} ]] && continue
     # Remove package if it's not declared or part of a declared group
-    [[ ${declared[$name]+yes} ]] || pkgs_to_remove+=("$name")
+    [[ ${declared_pkgs[$name]+yes} ]] || pkgs_to_remove+=("$name")
 done
 
 
