@@ -429,9 +429,9 @@ main() {
         parse_action $action
         #
         # Degbug:
-        #[[ -n $status ]] && printf '\n%s\n' "$status"
-        #printf '\n'
-        #read -n 1 -p "Press any key to coninue"
+        [[ -n $status ]] && printf '\n%s\n' "$status"
+        printf '\n'
+        read -n 1 -p "Press any key to coninue"
         # End of debug
         #
         # Prepare for next round
