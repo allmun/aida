@@ -308,7 +308,11 @@ run_chroot_shell_commands() {
   echo "Opening chroot shell."
   echo "Execute any bash command here to modify the snapshot."
   echo "Type 'exit' to end the interactive shell."
-  chroot $aida_mnt_dir /usr/bin/bash "$@"
+  if [[ -n "$@" ]]; then
+      chroot $aida_mnt_dir "$@"
+  else
+      chroot $aida_mnt_dir /usr/bin/bash
+  fi
   echo "Interactive chroot shell closed."
   # Unmount all binding for chroot enviroment
   cleanup_chroot

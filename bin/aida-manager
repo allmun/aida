@@ -264,6 +264,40 @@ update_snapshot_number() {
     return 0
 }
 
+run_shell_on_snapshot_number() {
+    local number=$1
+    local snapname="${snapshot_names[number - 1]}"
+    local snapdate="$(name_to_datetime $snapname)"
+    # Cannot update current root
+    if [[ "$(check_root $snapname)" == "R" ]]; then
+        status="Error: Cannot update root. Please create a clone or select another snapshot"
+        return 1
+    fi
+    # Mount snapshot but return of unsuccesfull
+    remount_snapshot_number "$number"
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+    # Get commands to execute from the user
+    read -p "Shell command to execute or press enter to run interactive terminal: " shell_commands
+    # Run shell commands on mounted snapshot if possible
+    if [[ -n "$mount_name" ]]; then
+        echo "Running shell commands $shell_commands on snapshot $mount_name ($snapdate) ..."
+        status="Executed shell commands $shell_commands on snapshot $mount_name ($snapdate)"
+        stderr="unknown"
+        command aida-shell $shell_commands
+        if [ $? -ne 0 ]; then
+            status="Error: Cannot update snapshot $number ($snapname): $stderr."
+            return 1
+        fi
+    else
+        status="Cannot switch to new snapshot: No snapshot mounted"
+        return 1
+    fi
+    return 0
+
+}
+
 edit_snapshot_number() {
     local number=$1
     local snapname="${snapshot_names[number - 1]}"
@@ -335,6 +369,16 @@ parse_action() {
                     if (( number > 0 && number <= length )); then
                         status="Updating snapshot: $number"
                         update_snapshot_number "$number"
+                    fi
+                fi
+                ;;
+            [sS]* )
+                read -p " " number
+                status="Invalid number: $number"
+                if [[ $number =~ ^-?[0-9]+$ ]]; then
+                    if (( number > 0 && number <= length )); then
+                        status="Running shell commands on snapshot: $number"
+                        run_shell_on_snapshot_number "$number"
                     fi
                 fi
                 ;;
@@ -424,7 +468,7 @@ main() {
         # Clear screen:
         printf "\033[H\033[J" ""
         print_table
-        printf "Actions: q (quit), c (clone), d (delete), u (update), g (grub) e (edit): "
+        printf "Actions: q (quit), c (clone), d (delete), u (update), s (shell), g (grub), e (edit): "
         read -n 1 action
         parse_action $action
         #
