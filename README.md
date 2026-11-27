@@ -4,6 +4,8 @@ Atomic Immutable Declarative Archlinux
 
 ## Latest news
 
+2026-11-25: Added more features to aida-manager: help, whole update cycle to main menu and added reboot and shutdown options to quit command.
+
 2026-11-12: Minor changes to installation process to enable the choice of using the default declarative configuration or generating the declarative configuration from the current system configuration.
 
 2026-11-09: Major redesign of installation process. Now, only two scripts (separated by a system reboot) are needed for installating aida. Also, mounting of  snapshots and the /etc overlays has been streamlined using initcpio hooks. 
