@@ -51,8 +51,6 @@ get_mount_name() {
     echo "Mounted snapshot: $mount_name"
 }
 
-
-
 # Chekck if argument equals the namoe of the currently mounted root snapshot
 check_root() {
     local snapshot=$1
@@ -82,6 +80,12 @@ check_mounted_index() {
     local index=$1
     local snapshot="${snapshot_names[$index]}"
     check_mounted "$snapshot"
+}
+
+print_status_and_wait_user() {
+    [[ -n $status ]] && printf '\n%s\n' "$status"
+    printf '\n'
+    read -n 1 -p "Press any key to coninue"
 }
 
 # Delete multiple snopshots except the root or grub snapshots
@@ -298,6 +302,33 @@ run_shell_on_snapshot_number() {
 
 }
 
+whole_update_cycle_snapshot_number() {
+    local number=$1
+    local snapname="${snapshot_names[number - 1]}"
+    local snapdate="$(name_to_datetime $snapname)"
+
+    # Clone snapshot
+    clone_snapshot_number "$number"
+    if [ $? -ne 0 ]; then
+        status="Error: Cannot clone snapshot $number ($snapdate)"
+        return 1
+    fi
+
+    # Update new snapshot
+    update_root_subvol
+    if [ $? -ne 0 ]; then
+        status="Error: Cannot update new snapshot derived from $number ($snapdate)"
+        return 1
+    fi
+
+    # Switch to new snapshot
+    switch_to_new_snapshot
+    if [ $? -ne 0 ]; then
+        status="Error: Cannot switch to new snapshot updated from $number ($snapdate)"
+        return 1
+    fi
+}
+
 edit_snapshot_number() {
     local number=$1
     local snapname="${snapshot_names[number - 1]}"
@@ -315,7 +346,7 @@ edit_snapshot_number() {
     status="Edited:"
     while [ true ]; do
         printf "\n"
-        read -n 1 -p "Edit: p (pacman.packages), s (system.services), u (user.services), d (done): " action
+        read -n 1 -p "Edit: p (pacman.packages), s (system.services), u (user.services), e (exit): " action
         case $action in
             [pP]* )
                 status="$status pacman.packages declaration"
@@ -332,12 +363,47 @@ edit_snapshot_number() {
                 nano /var/aida/mnt/etc/aida/user.services
                 continue
                 ;;
-            [dD]* )
+            [eE]* )
                 break
                 ;;
             * )
                 continue
                 ;;
+        esac
+    done
+}
+
+do_reboot() {
+    while [ true ]; do
+        read -n 1 -p "Reboot now [y/n] " answer
+        case $answer in
+            [yY]* ) systemctl reboot; break ;;
+            [nN]* ) break;;
+        esac
+    done
+}
+do_shutdown() {
+    while [ true ]; do
+        read -n 1 -p "Power off now [y/n] " answer
+        case $answer in
+            [yY]* ) systemctl poweroff; break ;;
+            [nN]* ) break;;
+        esac
+    done
+}
+quit_reboot_shutdown() {
+    # Continue (exit program normally), reboot, or shutdown
+    while [ true ]; do
+        printf "\n\n"
+        [[ "$grub_name" != "$root_name" ]] && printf "Reboot to activate new grub snapshot $grub_name\n\n"
+        #printf "\n"
+        read -n 1 -p "Action: C (cancel), Q (quit normally), R (reboot), P (power off): [c/q/r/p]: " choice
+        #printf "\n"
+        case $choice in
+            [rR]* ) printf "\n\n"; do_reboot;;
+            [pP]* ) printf "\n\n"; do_shutdown;;
+            [cC]* ) printf "\n\n"; break;;
+            [qQ]* ) printf "\n\nStaying on current image. Please reboot ASAP...\n\n"; exit 0; break ;;
         esac
     done
 }
@@ -349,8 +415,7 @@ parse_action() {
     local maximum=${#snapshot_names[@]}
     case $action in
             [qQ]* )
-                printf "\n\n"
-                exit 0
+                quit_reboot_shutdown
                 ;;
             [cC]* )
                 read -p " " number
@@ -359,6 +424,16 @@ parse_action() {
                     if (( number > 0 && number <= length )); then
                         status="Cloning snapshot: $number"
                         clone_snapshot_number "$number"
+                    fi
+                fi
+                ;;
+            [wW]* )
+                read -p " " number
+                status="Invalid number: $number"
+                if [[ $number =~ ^-?[0-9]+$ ]]; then
+                    if (( number > 0 && number <= length )); then
+                        status="Cloning snapshot: $number"
+                        whole_update_cycle_snapshot_number "$number"
                     fi
                 fi
                 ;;
@@ -410,6 +485,40 @@ parse_action() {
                     status="Deleting: $numbers"
                     delete_multiple_snapshot_numbers $numbers
                 fi
+                ;;
+            [hH]* )
+                printf '\n\n'
+                cat <<EOF
+    Command     Explanation
+
+       q         Quit/exit aida-manager
+                    c      Cancel and return to main menu
+                    q      Quit aida-manager normally and continue working in existing snapshot
+                    r      Reboot into new snapshot [y/n]
+                    p      Power system off [y/n]
+
+       c         Clone an existing snapshots. New snapshot will be #1
+
+       d         Delete an existing snapshot (except Root and Grub snapshots)
+
+       u         Update a mounted snapshot (except Root snapshot)
+
+       s         Run Shell commands on snapshot (except Root snapshot)
+
+       g         Update Grub menu to boot from selected snapshot
+
+       e         Edit Declaration for snapshot (except Root snapshot):
+                    p      Edit list of pacman Packages
+                    s      Edit list of systemd system services
+                    u      Edit list of systemd user services
+                    e      Exit to main manu
+
+       w         Whole update cycle: Clone, update, and switch (grub) from specified snapshot
+
+       h         This message
+EOF
+                printf '\n'
+                read -n 1 -p "Press any key to coninue"
                 ;;
             * )
                 status="Illegal command: $action"
@@ -468,16 +577,9 @@ main() {
         # Clear screen:
         printf "\033[H\033[J" ""
         print_table
-        printf "Actions: q (quit), c (clone), d (delete), u (update), s (shell), g (grub), e (edit): "
+        printf "Actions: q (quit), c (clone), d (delete), u (update), s (shell), g (grub), e (edit), w (whole), h (help): "
         read -n 1 action
         parse_action $action
-        #
-        # Degbug:
-        [[ -n $status ]] && printf '\n%s\n' "$status"
-        printf '\n'
-        read -n 1 -p "Press any key to coninue"
-        # End of debug
-        #
         # Prepare for next round
         get_grub_name
         get_mount_name
